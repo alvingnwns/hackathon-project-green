@@ -1,12 +1,14 @@
 # Backend
 backend/green_venv/
 backend/__pycache__/
-backend/api/__pycache__/
-backend/core/__pycache__/
-backend/services/__pycache__/
 backend/.env
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
