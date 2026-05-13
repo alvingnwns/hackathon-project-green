@@ -9,6 +9,7 @@ from core.config import settings
 from services.ai_analyzer import analyze_landscape
 from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
+from services.meshy_engine import generate_3d_model
 import numpy as np
 
 register_heif_opener()
@@ -35,7 +36,9 @@ async def process_landscape(file: UploadFile = File(...)):
         target_label = "ground" # Fallback dasar
         
         if len(components) > 0:
-            raw_target = components[0].get("target_area", "ground")
+            target_item = components[0]
+            prompt_3d = target_item.get("to_generate", prompt_3d)
+            raw_target = target_item.get("target_area", "ground")
             # Pengaman bahasa
             if "LAHAN KOSONG" in raw_target.upper():
                 target_label = "ground"
@@ -65,13 +68,25 @@ async def process_landscape(file: UploadFile = File(...)):
         
         # PANGGIL FUNGSI YANG SUDAH DIREFACTOR
         spatial_data = extract_depth_at_pixel(img, target_u, target_v)
+    
+        print(f"➡️ Menjalankan Node 4: Generating 3D Model for '{prompt_3d}'...")
+        meshy_result = generate_hybrid_3d(prompt_3d)
 
-        # --- FINAL RESPONSE ---
+        # --- SEMUA HASIL ---
         return {
             "status": "success",
-            "analysis": analysis_result,
-            "vision_detection": vision_data,
-            "spatial_placement": spatial_data
+            "project_context": {
+                "concept": analysis_result.get("green_solution", {}).get("concept_name"),
+            },
+            "visual_analysis": {
+                "gemini_report": analysis_result,
+                "vision_detection": vision_data or "Fallback to Center"
+            },
+            "spatial_data": spatial_data,
+            "generated_asset": {
+                "name": prompt_3d,
+                "preview_model_url": meshy_result.get("model_url"), # <-- Ditampilkan langsung di React
+            }
         }
 
     except Exception as e:

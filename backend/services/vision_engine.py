@@ -1,6 +1,7 @@
 import torch
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+from core.config import settings
 
 # 1. Deteksi Hardware (GPU/CPU)
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -9,8 +10,14 @@ print(f"⏳ Memuat model Grounding DINO ke {device}...")
 # 2. Inisialisasi Model Vision (Grounding DINO Tiny)
 # Model ini kecil, sangat cepat, tapi sangat pintar mencari objek dari teks
 model_id = "IDEA-Research/grounding-dino-tiny"
-processor = AutoProcessor.from_pretrained(model_id)
-model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(device)
+processor = AutoProcessor.from_pretrained(
+    model_id,
+    token=settings.HF_API_TOKEN
+    )
+model = AutoModelForZeroShotObjectDetection.from_pretrained(
+    model_id,
+    token=settings.HF_API_TOKEN
+    ).to(device)
 
 print(f"✅ Vision Engine (Grounding DINO) siap di memori lokal ({device})!")
 
