@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import google.generativeai as genai
 from PIL import Image
+from pillow_heif import register_heif_opener
 
 load_dotenv()
+register_heif_opener()
 
 # Konfigurasi Gemini
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-3-flash-preview')
 
 app = FastAPI()
 
@@ -26,8 +28,8 @@ app.add_middleware(
 
 @app.post("/api/v1/process-landscape")
 async def process_landscape(file: UploadFile = File(...)):
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Format harus JPG/PNG")
+    if file.content_type not in ["image/jpeg", "image/png", "image/heic", "image/heif"]:
+        raise HTTPException(status_code=400, detail="Format file tidak didukung.")
 
     try:
         # Baca image untuk dikirim ke Gemini
@@ -36,28 +38,53 @@ async def process_landscape(file: UploadFile = File(...)):
 
         # Prompt untuk Node 1 (Analysis & Designing)
         prompt = """
-        Bertindaklah sebagai arsitek lanskap permakultur. 
-        Analisis gambar bangunan/lahan terbengkalai ini dan buatkan rencana transformasi menjadi taman produktif.
-        
-        Berikan output dalam format JSON murni dengan struktur berikut:
+        Role: Kamu adalah Environment Designer & Structural Analyst untuk proyek "Green Innovation".
+        Tugas: Mentransformasi lahan/bangunan terbengkalai menjadi kawasan hijau produktif (Permakultur) dengan fokus pada minimalisasi limbah (Zero Waste) dan efisiensi biaya.
+
+        Tugas Spesifik:
+        1. Analisis Visual: Deteksi material bangunan (beton, kayu, besi), tingkat kerusakan, dan potensi biodiversitas.
+        2. Keputusan Struktural: Lakukan penalaran (Reasoning) apakah bangunan lebih baik di-alihfungsikan (Retain), dihancurkan (Demolish), atau ditambah struktur hijau (Augment) berdasarkan prinsip biaya minimum dan emisi karbon terendah.
+        3. Early Segmentation: Identifikasi 3-5 komponen fisik utama yang perlu diubah menjadi aset 3D.
+
+        Rules & Constraints:
+        - Fokus pada "Low-Cost, High-Impact".
+        - Jika bangunan dihancurkan, hitung estimasi debris (sampah konstruksi) dan solusi pengolahannya.
+        - Gunakan satuan metrik (meter) dan estimasi biaya dalam IDR (Rupiah).
+        - Output HARUS selalu dalam format JSON agar dapat diproses oleh pipeline automated.
+
+        Output Structure (JSON):
         {
-          "design_description": "penjelasan singkat konsep taman baru",
-          "visual_prompt": "prompt detail untuk generator gambar (stable diffusion) agar menghasilkan desain baru",
-          "components": [
-            {"id": 1, "label": "objek 3D 1", "description": "misal: wooden gazebo"},
-            {"id": 2, "label": "objek 3D 2", "description": "misal: gabion planter bed"}
-          ]
+        "analysis": {
+            "land_size_est": "string",
+            "building_condition": "string",
+            "structural_decision": "Retain/Demolish/Augment",
+            "reasoning": "penjelasan logis keputusan tersebut"
+        },
+        "green_solution": {
+            "concept_name": "string",
+            "description": "string",
+            "estimated_cost": "number (dalam IDR)",
+            "waste_management": "rencana pengolahan debris"
+        },
+        "image_gen_prompt": "Prompt detail untuk generator gambar (landscape view, photorealistic, permaculture style)",
+        "components_for_3d": [
+            {
+            "id": 1,
+            "label": "deskripsi singkat objek (misal: 'modern timber gazebo')",
+            "position_hint": "atas/tengah/bawah/kiri/kanan"
+            }
+        ]
         }
-        Batasi komponen maksimal 5 objek paling menonjol.
         """
 
         # Panggil Gemini
-        response = model.generate_content([prompt, img])
+        response = model.generate_content(
+            [prompt, img],
+            generation_config={"response_mime_type": "application/json"}
+            )
         
         # Parsing hasil JSON dari Gemini
-        # (Menghapus markdown ```json jika ada)
-        clean_response = response.text.replace('```json', '').replace('```', '').strip()
-        analysis_result = json.loads(clean_response)
+        analysis_result = json.loads(response.text)
 
         return {
             "status": "success",
