@@ -39,7 +39,8 @@ prompt = """
         "components_for_3d": [
             {
             "id": 1,
-            "label": "deskripsi singkat objek (misal: 'modern timber gazebo')",
+            "to_generate": "deskripsi singkat objek (misal: 'modern timber gazebo')",
+            "target_area": "deskripsikan MATERIAL FISIK asli di foto yang akan ditimpa dalam BAHASA INGGRIS (contoh: 'concrete ruins', 'dirt ground', 'dry grass', 'pavement'. Jika hanya lahan kosong, return: 'dirt ground' atau 'grass')",
             "position_hint": "atas/tengah/bawah/kiri/kanan"
             }
         ]
