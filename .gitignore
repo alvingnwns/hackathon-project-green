@@ -1,0 +1,9 @@
+# Backend
+backend/green_venv/
+backend/__pycache__/
+backend/.env
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+.DS_Store
