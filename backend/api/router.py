@@ -21,9 +21,13 @@ async def process_landscape(file: UploadFile = File(...)):
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
         # 2. Eksekusi Services
+        print("➡️ Menjalankan Node 1: Gemini Analysis...")
         analysis_json_str = analyze_landscape(img)
+        print(f"✅ Gemini Response Text: {analysis_json_str[:50]}...") # Print sedikit untuk cek isinya
+        
         analysis_result = json.loads(analysis_json_str)
         
+        print("➡️ Menjalankan Node 5: Depth Extraction...")
         spatial_data = extract_center_depth(img)
 
         # 3. Kembalikan Response

@@ -1,36 +1,43 @@
-import io
-import os
-import requests
 import numpy as np
+import torch
 from PIL import Image
+from transformers import pipeline
 from core.config import settings
 
-# Endpoint resmi dari Hugging Face Inference API
-API_URL = os.getenv("API_URL")
-headers = {"Authorization": f"Bearer {settings.HF_API_TOKEN}"}
+# 1. Deteksi Hardware (GPU/CPU)
+if torch.cuda.is_available():
+    device = 0
+    device_name = "GPU (CUDA)"
+elif torch.backends.mps.is_available():
+    device = "mps"
+    device_name = "GPU (Apple MPS)"
+else:
+    device = -1
+    device_name = "CPU"
+
+print(f"⏳ Memuat model Depth-Anything-V2 ke {device_name}...")
+
+# 2. Inisialisasi Pipeline dengan alokasi device
+depth_estimator = pipeline(
+    task="depth-estimation", 
+    model="depth-anything/Depth-Anything-V2-Small-hf",
+    device=device,
+    token=settings.HF_API_TOKEN
+)
+
+print(f"✅ Model Depth-Anything-V2 siap di memori lokal ({device_name})!")
 
 def extract_center_depth(image: Image.Image):
-    # 1. Konversi gambar PIL kembali ke format byte (JPEG) untuk dikirim
-    img_byte_arr = io.BytesIO()
-    image.save(img_byte_arr, format='JPEG')
-    img_bytes = img_byte_arr.getvalue()
+    print(f"🖥️ Memproses depth map menggunakan {device_name} lokal...")
+    
+    # Eksekusi model lokal
+    depth_result = depth_estimator(image)
+    
+    # Hasil balikan dari pipeline adalah dictionary dengan key "depth" berupa PIL Image grayscale
+    depth_map_img = depth_result["depth"]
+    depth_array = np.array(depth_map_img)
 
-    # 2. Tembak API Hugging Face
-    print("☁️ Mengirim gambar ke Hugging Face API untuk kalkulasi kedalaman...")
-    response = requests.post(API_URL, headers=headers, data=img_bytes)
-
-    if response.status_code != 200:
-        # Menangani kasus "Cold Start" dari sisi server Hugging Face
-        error_msg = response.json()
-        if "estimated_time" in error_msg:
-            raise Exception(f"Model Hugging Face sedang loading. Coba lagi dalam {int(error_msg['estimated_time'])} detik.")
-        raise Exception(f"Hugging Face API Error: {response.text}")
-
-    # 3. API mengembalikan gambar Depth Map dalam format binary
-    depth_image = Image.open(io.BytesIO(response.content))
-    depth_array = np.array(depth_image)
-
-    # 4. Kalkulasi nilai Z di titik tengah
+    # Kalkulasi Z di titik tengah
     height, width = depth_array.shape
     center_y, center_x = height // 2, width // 2
     center_z_value = int(depth_array[center_y, center_x])
@@ -39,5 +46,5 @@ def extract_center_depth(image: Image.Image):
         "image_resolution": f"{width}x{height}",
         "center_coordinate": {"u": center_x, "v": center_y},
         "center_depth_Z": center_z_value,
-        "source": "Hugging Face API"
+        "source": f"Local Inference ({device_name})"
     }

@@ -51,4 +51,11 @@ def analyze_landscape(image):
         [prompt, image],
         generation_config={"response_mime_type": "application/json"}
     )
-    return response.text
+
+    raw_text = response.text.strip()
+    if raw_text.startswith("```json"):
+        raw_text = raw_text.replace("```json", "", 1)
+
+    if raw_text.endswith("```"):
+        raw_text = raw_text[: -3]
+    return raw_text.strip()
