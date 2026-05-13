@@ -1,6 +1,6 @@
 # Backend
 backend/green_venv/
-backend/__pycache__/
+__pycache__/
 backend/.env
 
 # Frontend
