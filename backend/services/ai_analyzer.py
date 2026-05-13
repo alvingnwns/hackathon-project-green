@@ -21,7 +21,7 @@ prompt = """
         - Gunakan satuan metrik (meter) dan estimasi biaya dalam IDR (Rupiah).
         - Output HARUS selalu dalam format JSON agar dapat diproses oleh pipeline automated.
 
-        Output Structure (JSON):
+        Output Structure (JSON & MUST BE IN ENGLISH):
         {
         "analysis": {
             "land_size_est": "string",

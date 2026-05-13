@@ -69,26 +69,29 @@ def pixel_to_3d(u, v, z_raw, width, height, fov_degrees=70):
 
     return round(X, 2), round(Y, 2), round(z_metric, 2)
 
-def extract_center_depth(image: Image.Image):
+def extract_depth_at_pixel(image: Image.Image, target_u: int, target_v: int):
+    """Mengekstrak Z dan kalkulasi 3D berdasarkan koordinat piksel spesifik"""
     print(f"🖥️ Memproses depth map menggunakan {device_name} lokal...")
     
     # Eksekusi model lokal
     depth_result = depth_estimator(image)
-    
-    # Hasil balikan dari pipeline adalah dictionary dengan key "depth" berupa PIL Image grayscale
     depth_map_img = depth_result["depth"]
     depth_array = np.array(depth_map_img)
 
-    # Kalkulasi Z di titik tengah
     height, width = depth_array.shape
-    center_y, center_x = height // 2, width // 2
-    center_z_value = int(depth_array[center_y, center_x])
+    
+    # Pengaman batas agar koordinat tidak melebihi resolusi (Out of Bounds)
+    target_u = min(max(target_u, 0), width - 1)
+    target_v = min(max(target_v, 0), height - 1)
+    
+    # Kalkulasi Z di titik target
+    target_z_value = int(depth_array[target_v, target_u])
 
     # Ekstrak FOV Dinamis dari Gambar
     dynamic_fov = get_fov_from_exif(image)
 
     # Konversi ke 3D dengan FOV yang sudah disesuaikan
-    X, Y, Z_metric = pixel_to_3d(center_x, center_y, center_z_value, width, height, fov_degrees=dynamic_fov)
+    X, Y, Z_metric = pixel_to_3d(target_u, target_v, target_z_value, width, height, fov_degrees=dynamic_fov)
 
     return {
         "image_resolution": f"{width}x{height}",
@@ -96,8 +99,8 @@ def extract_center_depth(image: Image.Image):
             "estimated_fov_degrees": round(dynamic_fov, 2),
             "is_fallback": dynamic_fov == 70.0
         },
-        "center_coordinate": {"u": center_x, "v": center_y},
-        "center_depth_Z": center_z_value,
+        "target_coordinate": {"u": target_u, "v": target_v},
+        "raw_depth_Z": target_z_value,
         "spatial_3d_coordinates": {
             "X_meter": X,
             "Y_meter": Y,

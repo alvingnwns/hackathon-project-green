@@ -7,7 +7,7 @@ from core.config import settings
 
 # Import semua engine kita
 from services.ai_analyzer import analyze_landscape
-from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator
+from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
 import numpy as np
 
@@ -58,39 +58,20 @@ async def process_landscape(file: UploadFile = File(...)):
 
         # --- NODE 5 & 6: Depth & Spatial Engine ---
         print("➡️ Menjalankan Node 5 & 6: Spatial Mapping...")
-        dynamic_fov = get_fov_from_exif(img)
-        
-        # Eksekusi Depth-Anything
-        depth_result = depth_estimator(img)
-        depth_array = np.array(depth_result["depth"])
-        
-        # Ambil titik (u, v) dari hasil pencarian Vision Engine!
+       
+       # Ambil titik (u, v) dari hasil pencarian Vision Engine
         target_u = vision_data["center_coordinate"]["u"]
         target_v = vision_data["center_coordinate"]["v"]
         
-        # Pengaman agar koordinat tidak melebihi resolusi gambar
-        target_u = min(max(target_u, 0), width - 1)
-        target_v = min(max(target_v, 0), height - 1)
-        
-        target_z_raw = int(depth_array[target_v, target_u])
-
-        # Kalkulasi ke X, Y, Z dunia nyata
-        X, Y, Z_metric = pixel_to_3d(target_u, target_v, target_z_raw, width, height, fov_degrees=dynamic_fov)
+        # PANGGIL FUNGSI YANG SUDAH DIREFACTOR
+        spatial_data = extract_depth_at_pixel(img, target_u, target_v)
 
         # --- FINAL RESPONSE ---
         return {
             "status": "success",
             "analysis": analysis_result,
             "vision_detection": vision_data,
-            "spatial_placement": {
-                "camera_fov": round(dynamic_fov, 2),
-                "raw_depth_Z": target_z_raw,
-                "final_3d_coordinates": {
-                    "X_meter": X,
-                    "Y_meter": Y,
-                    "Z_meter": Z_metric
-                }
-            }
+            "spatial_placement": spatial_data
         }
 
     except Exception as e:

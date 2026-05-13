@@ -32,7 +32,6 @@ def find_target_object(image: Image.Image, text_prompt: str):
     results = processor.post_process_grounded_object_detection(
         outputs,
         inputs.input_ids,
-        box_threshold=0.3,
         text_threshold=0.3,
         target_sizes=target_sizes
     )[0]
