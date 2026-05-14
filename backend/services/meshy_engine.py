@@ -1,5 +1,5 @@
-import time
-import requests
+import asyncio
+import httpx
 from core.config import settings
 
 MESHY_URL = "https://api.meshy.ai/v2/text-to-3d"
@@ -7,18 +7,15 @@ HEADERS = {
     "Authorization": f"Bearer {settings.MESHY_API_KEY}"
 }
 
-def generate_3d_model(base_prompt: str):
+async def generate_3d_model_async(base_prompt: str, client: httpx.AsyncClient):
     enhanced_prompt = (
         f"A clean and professional 3D model of a {base_prompt}. "
         "Simple textures, mid-poly aesthetic, architectural model style, "
         "vibrant colors, well-lit, isometric view."
     )
     
-    print(f"🪄 [FASE 1] Meminta Meshy membuat PREVIEW (Bentuk Kasar) untuk:\n   '{base_prompt}'...")
+    print(f"🪄 [FASE 1] Meminta Meshy membuat PREVIEW untuk: '{base_prompt}'...")
 
-    # ==========================================
-    # FASE 1: PREVIEW TASK
-    # ==========================================
     preview_payload = {
         "mode": "preview", 
         "prompt": enhanced_prompt,
@@ -26,75 +23,86 @@ def generate_3d_model(base_prompt: str):
         "should_remesh": True
     }
 
-    res_preview = requests.post(MESHY_URL, headers=HEADERS, json=preview_payload)
+    res_preview = await client.post(MESHY_URL, headers=HEADERS, json=preview_payload)
     if res_preview.status_code != 202:
-        raise Exception(f"Meshy API Error (Preview): {res_preview.text}")
+        raise Exception(f"Meshy API Error (Preview) for {base_prompt}: {res_preview.text}")
 
     preview_task_id = res_preview.json().get("result")
     print(f"⏳ Task ID Preview {preview_task_id} dibuat! Menunggu mesh selesai...")
 
-    # Polling Fase 1 (Dynamic While Loop)
     elapsed_time = 0
     while True:
-        time.sleep(10)
+        await asyncio.sleep(10)
         elapsed_time += 10
-        res = requests.get(f"{MESHY_URL}/{preview_task_id}", headers=HEADERS).json()
-        status = res.get("status")
-        
-        print(f"   [Preview] Status: {status}... ({elapsed_time} detik)")
+        res = await client.get(f"{MESHY_URL}/{preview_task_id}", headers=HEADERS)
+        data = res.json()
+        status = data.get("status")
         
         if status == "SUCCEEDED":
             break
         elif status in ["FAILED", "EXPIRED", "CANCELED"]:
-            raise Exception(f"Preview gagal dirender: {res.get('task_error')}")
+            raise Exception(f"Preview gagal untuk '{base_prompt}': {data.get('task_error')}")
 
-    print("✨ Fase 1 Selesai! Melanjutkan ke [FASE 2: REFINE] untuk baking tekstur PBR...")
+    print(f"✨ Fase 1 '{base_prompt}' Selesai! Melanjutkan ke [FASE 2: REFINE]...")
 
-    # ==========================================
-    # FASE 2: REFINE TASK (Baking Texture)
-    # ==========================================
     refine_payload = {
         "mode": "refine",
         "preview_task_id": preview_task_id
     }
 
-    res_refine = requests.post(MESHY_URL, headers=HEADERS, json=refine_payload)
+    res_refine = await client.post(MESHY_URL, headers=HEADERS, json=refine_payload)
     if res_refine.status_code != 202:
-        raise Exception(f"Meshy API Error (Refine): {res_refine.text}")
+        raise Exception(f"Meshy API Error (Refine) for {base_prompt}: {res_refine.text}")
 
     refine_task_id = res_refine.json().get("result")
-    print(f"⏳ Task ID Refine {refine_task_id} dibuat! Menunggu tekstur...")
-
-    # Polling Fase 2 (Dynamic While Loop)
+    
     elapsed_time = 0
     while True:
-        time.sleep(10)
+        await asyncio.sleep(10)
         elapsed_time += 10
-        res = requests.get(f"{MESHY_URL}/{refine_task_id}", headers=HEADERS).json()
-        status = res.get("status")
-        
-        # Print tiap 15 detik saja biar terminal tetap bersih
-        if elapsed_time % 10 == 0 or status == "SUCCEEDED":
-            print(f"   [Refine] Status: {status}... ({elapsed_time} detik)")
+        res = await client.get(f"{MESHY_URL}/{refine_task_id}", headers=HEADERS)
+        data = res.json()
+        status = data.get("status")
 
         if status == "SUCCEEDED":
-            model_urls = res.get("model_urls", {})
+            model_urls = data.get("model_urls", {})
             glb_url = model_urls.get("glb")
-            print(f"✅ Model 3D bertekstur tinggi '{base_prompt}' selesai dirakit!")
+            print(f"✅ Model 3D '{base_prompt}' selesai dirakit!")
             return {
                 "task_id": refine_task_id,
                 "model_url": glb_url,
-                "status": status
+                "status": status,
+                "prompt": base_prompt
             }
         elif status in ["FAILED", "EXPIRED", "CANCELED"]:
-            raise Exception(f"Refine gagal dirender: {res.get('task_error')}")
+            raise Exception(f"Refine gagal untuk '{base_prompt}': {data.get('task_error')}")
+
+async def generate_multiple_models(prompts: list[str]):
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        tasks = [generate_3d_model_async(prompt, client) for prompt in prompts]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return results
+
+def generate_3d_model(base_prompt: str):
+    # Menyediakan fallback fungsi sinkronus agar tidak mematahkan kode lama yang memanggil secara sinkronus
+    return asyncio.run(generate_multiple_models([base_prompt]))[0]
 
 # --- SCRIPT PENGUJIAN SEMENTARA ---
 if __name__ == "__main__":
-    try:
-        print("🚀 Memulai tes Meshy API Pipeline (Preview + Refine)...")
-        test_prompt = "sustainable bamboo educational pavilion"
-        hasil = generate_3d_model(test_prompt)
-        print("\n🎉 HASIL URL GLB (TEXTURED):", hasil["model_url"])
-    except Exception as e:
-        print("\n❌ ERROR:", e)
+    async def test_parallel():
+        print("🚀 Memulai tes Meshy API Pipeline secara PARALEL...")
+        test_prompts = ["sustainable bamboo pavilion", "small solar panel array"]
+        start_time = time.time()
+        
+        hasil = await generate_multiple_models(test_prompts)
+        
+        print(f"\n⏱️ Waktu total: {time.time() - start_time:.2f} detik")
+        print("\n🎉 HASIL URL GLB (TEXTURED):")
+        for res in hasil:
+            if isinstance(res, Exception):
+                print(f"❌ Error: {res}")
+            else:
+                print(f"- {res['prompt']}: {res['model_url']}")
+
+    import time
+    asyncio.run(test_parallel())
