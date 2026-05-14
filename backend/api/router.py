@@ -9,7 +9,7 @@ from core.config import settings
 from services.ai_analyzer import analyze_landscape
 from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
-from services.meshy_engine import generate_3d_model
+from services.meshy_engine import generate_multiple_models
 import numpy as np
 
 register_heif_opener()
@@ -31,64 +31,89 @@ async def process_landscape(file: UploadFile = File(...)):
         analysis_json_str = analyze_landscape(img)
         analysis_result = json.loads(analysis_json_str)
         
-        # Ekstrak target_area dari saran Gemini
+        # Ekstrak komponen dari saran Gemini
         components = analysis_result.get("components_for_3d", [])
-        target_label = "ground" # Fallback dasar
         
-        if len(components) > 0:
-            target_item = components[0]
-            prompt_3d = target_item.get("to_generate", prompt_3d)
-            raw_target = target_item.get("target_area", "ground")
+        # Proses pipeline paralel untuk Multi-Object
+        processed_components = []
+        prompts_to_generate = []
+
+        if not components:
+            # Fallback jika kosong
+            components = [{"to_generate": "bamboo pavilion", "target_area": "ground", "description": "Fallback asset"}]
+
+        for idx, item in enumerate(components):
+            prompt_3d = item.get("to_generate", "building")
+            raw_target = item.get("target_area", "ground")
+            position_hint = item.get("position_hint", "middle")
+            
             # Pengaman bahasa
-            if "LAHAN KOSONG" in raw_target.upper():
-                target_label = "ground"
+            target_label = "ground" if "LAHAN KOSONG" in raw_target.upper() else raw_target
+
+            # --- NODE 2 & 3: Vision Engine (Mencari Objek O C) ---
+            print(f"➡️ Menjalankan Node 2: Mencari area '{target_label}' untuk objek '{prompt_3d}'...")
+            vision_data = find_target_object(img, target_label, position_hint)
+
+            if not vision_data:
+                vision_data = {
+                    "label": target_label,
+                    "confidence": 0.0,
+                    "bounding_box": None,
+                    "center_coordinate": {"u": width // 2, "v": height // 2},
+                    "warning": "Objek tidak terdeteksi, menggunakan titik tengah fallback."
+                }
+
+            # --- NODE 5 & 6: Depth & Spatial Engine ---
+            print(f"➡️ Menjalankan Node 5 & 6: Spatial Mapping untuk '{prompt_3d}'...")
+            target_u = vision_data["center_coordinate"]["u"]
+            target_v = vision_data["center_coordinate"]["v"]
+            
+            spatial_data = extract_depth_at_pixel(img, target_u, target_v)
+
+            # Simpan sementara komponen yang sudah punya koordinat
+            processed_components.append({
+                "id": idx,
+                "name": prompt_3d,
+                "description": item.get("description", ""),
+                "visual_data": vision_data,
+                "spatial_data": spatial_data
+            })
+            prompts_to_generate.append(prompt_3d)
+
+        # --- NODE 4: Generating 3D Models in Parallel ---
+        print(f"➡️ Menjalankan Node 4: Generating {len(prompts_to_generate)} 3D Models secara PARALEL...")
+        meshy_results = await generate_multiple_models(prompts_to_generate)
+
+        # Menggabungkan hasil Meshy kembali ke processed_components
+        final_assets = []
+        for i, res in enumerate(meshy_results):
+            comp = processed_components[i]
+            
+            if isinstance(res, Exception):
+                print(f"❌ Error rendering {comp['name']}: {res}")
+                model_url = None
             else:
-                target_label = raw_target
-
-        # --- NODE 2 & 3: Vision Engine (Mencari Objek) ---
-        print(f"➡️ Menjalankan Node 2: Mencari area '{target_label}'...")
-        vision_data = find_target_object(img, target_label)
-
-        if not vision_data:
-            # Fallback jika objek gaib/tidak ketemu
-            vision_data = {
-                "label": target_label,
-                "confidence": 0.0,
-                "bounding_box": None,
-                "center_coordinate": {"u": width // 2, "v": height // 2},
-                "warning": "Objek tidak terdeteksi, menggunakan titik tengah fallback."
-            }
-
-        # --- NODE 5 & 6: Depth & Spatial Engine ---
-        print("➡️ Menjalankan Node 5 & 6: Spatial Mapping...")
-       
-       # Ambil titik (u, v) dari hasil pencarian Vision Engine
-        target_u = vision_data["center_coordinate"]["u"]
-        target_v = vision_data["center_coordinate"]["v"]
-        
-        # PANGGIL FUNGSI YANG SUDAH DIREFACTOR
-        spatial_data = extract_depth_at_pixel(img, target_u, target_v)
-    
-        print(f"➡️ Menjalankan Node 4: Generating 3D Model for '{prompt_3d}'...")
-        meshy_result = generate_3d_model(prompt_3d)
+                model_url = res.get("model_url")
+                
+            final_assets.append({
+                "asset_id": comp["id"],
+                "name": comp["name"],
+                "description": comp["description"],
+                "model_url": model_url,
+                "spatial_data": comp["spatial_data"],
+                "vision_detection": comp["visual_data"]
+            })
 
         # --- SEMUA HASIL ---
         return {
             "status": "success",
             "project_context": {
-                "concept": analysis_result.get("green_solution", {}).get("concept_name"),
+                "concept": analysis_result.get("green_solution", {}).get("concept_name", "Eco Design"),
+                "gemini_full_report": analysis_result
             },
-            "visual_analysis": {
-                "gemini_report": analysis_result,
-                "vision_detection": vision_data or "Fallback to Center"
-            },
-            "spatial_data": spatial_data,
-            "generated_asset": {
-                "name": prompt_3d,
-                "preview_model_url": meshy_result.get("model_url"), # <-- Ditampilkan langsung di React
-            }
+            "assets": final_assets
         }
 
     except Exception as e:
-        print(f"Error di Router: {e}")
+        print(f"❌ Error di Router: {e}")
         raise HTTPException(status_code=500, detail=str(e))

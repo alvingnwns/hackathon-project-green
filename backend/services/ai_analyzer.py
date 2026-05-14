@@ -12,7 +12,7 @@ prompt = """
         Tugas Spesifik:
         1. Analisis Visual: Deteksi material bangunan (beton, kayu, besi), tingkat kerusakan, dan potensi biodiversitas.
         2. Keputusan Struktural: Lakukan penalaran (Reasoning) apakah bangunan lebih baik di-alihfungsikan (Retain), dihancurkan (Demolish), atau ditambah struktur hijau (Augment) berdasarkan prinsip biaya minimum dan emisi karbon terendah.
-        3. Early Segmentation: Identifikasi 3-5 komponen fisik utama yang perlu diubah menjadi aset 3D.
+        3. Early Segmentation: Identifikasi 3-5 komponen fisik utama yang perlu diubah menjadi aset 3D (jika lahan tidak kosong).
         4. Hapus Penghalang: Apabila terdeteksi object lain seperti manusia, hewan, hapus saja atau abaikan.
 
         Rules & Constraints:
@@ -20,7 +20,7 @@ prompt = """
         - Jika bangunan dihancurkan, hitung estimasi debris (sampah konstruksi) dan solusi pengolahannya.
         - Gunakan satuan metrik (meter) dan estimasi biaya dalam IDR (Rupiah).
         - Output HARUS selalu dalam format JSON agar dapat diproses oleh pipeline automated.
-        - Jika yang difoto ternyata adalah lahan kosong, sebisa mungkin jangan gunakan kayu karena kayu berarti harus menebang pohon, carilah alternatif lain yang lebih eco-friendly dan solusi hijau.
+        - Jika yang difoto ternyata adalah lahan kosong, sebisa mungkin jangan gunakan bahan baku kayu karena kayu berarti harus menebang pohon, carilah alternatif lain yang lebih eco-friendly dan solusi hijau.
 
         Output Structure (JSON & MUST BE IN ENGLISH):
         {
@@ -40,9 +40,9 @@ prompt = """
         "components_for_3d": [
             {
             "id": 1,
-            "to_generate": "nama beserta deskripsi detail objek (misal: 'modern timber gazebo', warnanya seperti apa, bentuknya seperti apa, dan lain-lain)",
-            "target_area": "deskripsikan MATERIAL FISIK asli di foto yang akan ditimpa dalam BAHASA INGGRIS (contoh: 'concrete ruins', 'dirt ground', 'dry grass', 'pavement'. Jika hanya lahan kosong, return: 'dirt ground' atau 'grass')",
-            "position_hint": "atas/tengah/bawah/kiri/kanan"
+            "to_generate": "nama beserta deskripsi detail objek (misal: 'modern timber gazebo', warnanya, dll)",
+            "target_area": "deskripsikan MATERIAL FISIK asli di foto yang akan ditimpa dalam BAHASA INGGRIS (contoh: 'dirt ground')",
+            "position_hint": "Tentukan posisi GRID 3x3: 'top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'. PENTING: TATA LETAK HARUS RAPI DAN LOGIS layaknya Arsitek (contoh: jalan ditaruh di bottom-center tembus ke center, gazebo di center, pohon di left dan right). JANGAN menaruh 2 objek di grid yang sama untuk menghindari tabrakan 3D."
             }
         ]
         }

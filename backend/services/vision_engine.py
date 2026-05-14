@@ -1,4 +1,5 @@
 import torch
+import random
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 from core.config import settings
@@ -21,8 +22,8 @@ model = AutoModelForZeroShotObjectDetection.from_pretrained(
 
 print(f"✅ Vision Engine (Grounding DINO) siap di memori lokal ({device})!")
 
-def find_target_object(image: Image.Image, text_prompt: str):
-    print(f"👁️ Mencari objek '{text_prompt}' di dalam gambar...")
+def find_target_object(image: Image.Image, text_prompt: str, position_hint: str = "center"):
+    print(f"👁️ Mencari objek '{text_prompt}' di dalam gambar (Grid Hint: {position_hint})...")
     
     # Grounding DINO mensyaratkan teks diakhiri dengan titik
     text = text_prompt.lower().strip()
@@ -52,21 +53,40 @@ def find_target_object(image: Image.Image, text_prompt: str):
     bbox = results["boxes"][best_idx].tolist() # [xmin, ymin, xmax, ymax]
     confidence = results["scores"][best_idx].item()
 
-    # 6. Hitung Titik Tengah (u, v) dari Bounding Box tersebut
-    center_u = int((bbox[0] + bbox[2]) / 2)
-    center_v = int((bbox[1] + bbox[3]) / 2)
+    # 6. Hitung Spasial berdasarkan Arsitektural 3x3 Grid
+    xmin, ymin, xmax, ymax = bbox
+    box_w = xmax - xmin
+    box_h = ymax - ymin
+    
+    hint = position_hint.lower()
+    
+    # Grid X (Columns: Left 1/6, Center 3/6, Right 5/6)
+    if "left" in hint:
+        target_u = xmin + (box_w * (1/6))
+    elif "right" in hint:
+        target_u = xmin + (box_w * (5/6))
+    else: # center column
+        target_u = xmin + (box_w * (3/6))
+
+    # Grid Y (Rows: Top 1/6, Center 3/6, Bottom 5/6)
+    if "top" in hint or "back" in hint:
+        target_v = ymin + (box_h * (1/6))
+    elif "bottom" in hint or "front" in hint:
+        target_v = ymin + (box_h * (5/6))
+    else: # center row
+        target_v = ymin + (box_h * (3/6))
 
     return {
         "label": text_prompt,
         "confidence": round(confidence, 2),
         "bounding_box": {
-            "xmin": round(bbox[0]),
-            "ymin": round(bbox[1]),
-            "xmax": round(bbox[2]),
-            "ymax": round(bbox[3])
+            "xmin": round(xmin),
+            "ymin": round(ymin),
+            "xmax": round(xmax),
+            "ymax": round(ymax)
         },
         "center_coordinate": {
-            "u": center_u,
-            "v": center_v
+            "u": int(target_u),
+            "v": int(target_v)
         }
     }
