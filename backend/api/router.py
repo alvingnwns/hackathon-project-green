@@ -70,7 +70,7 @@ async def process_landscape(file: UploadFile = File(...)):
         spatial_data = extract_depth_at_pixel(img, target_u, target_v)
     
         print(f"➡️ Menjalankan Node 4: Generating 3D Model for '{prompt_3d}'...")
-        meshy_result = generate_hybrid_3d(prompt_3d)
+        meshy_result = generate_3d_model(prompt_3d)
 
         # --- SEMUA HASIL ---
         return {

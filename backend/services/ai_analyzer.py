@@ -20,6 +20,7 @@ prompt = """
         - Jika bangunan dihancurkan, hitung estimasi debris (sampah konstruksi) dan solusi pengolahannya.
         - Gunakan satuan metrik (meter) dan estimasi biaya dalam IDR (Rupiah).
         - Output HARUS selalu dalam format JSON agar dapat diproses oleh pipeline automated.
+        - Jika yang difoto ternyata adalah lahan kosong, sebisa mungkin jangan gunakan kayu karena kayu berarti harus menebang pohon, carilah alternatif lain yang lebih eco-friendly dan solusi hijau.
 
         Output Structure (JSON & MUST BE IN ENGLISH):
         {
