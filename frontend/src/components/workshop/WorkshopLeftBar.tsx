@@ -10,22 +10,27 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [dryRun, setDryRun] = useState(true); // default ON to protect Meshy credits
 
   const handleImageUpload = async (file: File) => {
     setIsLoading(true);
-    setUploadStatus('Menganalisis gambar dengan AI...');
+    setUploadStatus(dryRun ? 'Simulation mode — skipping Meshy API...' : 'Analyzing image with AI...');
     const formData = new FormData();
     formData.append('file', file);
 
+    const url = dryRun
+      ? 'http://localhost:8000/api/v1/process-landscape?dry_run=true'
+      : 'http://localhost:8000/api/v1/process-landscape';
+
     try {
-      const response = await fetch('http://localhost:8000/api/v1/process-landscape', {
+      const response = await fetch(url, {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        alert('Error: ' + ((err as any).detail || 'Terjadi kesalahan saat memproses gambar'));
+        alert('Error: ' + ((err as any).detail || 'An error occurred while processing the image'));
         return;
       }
 
@@ -33,7 +38,7 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
       onDataLoaded(data);
       setUploadStatus(null);
     } catch {
-      alert('Tidak dapat terhubung ke server. Pastikan backend berjalan di port 8000.');
+      alert('Cannot connect to server. Make sure the backend is running on port 8000.');
       setUploadStatus(null);
     } finally {
       setIsLoading(false);
@@ -53,10 +58,10 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
         if (parsed.assets) {
           onDataLoaded(parsed);
         } else {
-          alert('Format JSON tidak sesuai. Harus memiliki field "assets".');
+          alert('Invalid JSON format. Must contain an "assets" field.');
         }
       } catch {
-        alert('Gagal membaca file JSON. Pastikan format file valid.');
+        alert('Failed to read JSON file. Make sure the file format is valid.');
       }
     };
     reader.readAsText(file);
@@ -89,8 +94,25 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
         onClick={() => fileInputRef.current?.click()}
         disabled={isLoading}
       >
-        {isLoading ? 'Memproses...' : 'Upload Image'}
+        {isLoading ? 'Processing...' : 'Upload Image'}
       </button>
+
+      {/* Simulation Mode toggle */}
+      <label className="flex items-center gap-2 cursor-pointer select-none" title="Simulation mode: skips Meshy API and uses stock GLBs. Disable only for production.">
+        <div
+          className="relative w-9 h-5 rounded-full transition-colors"
+          style={{ backgroundColor: dryRun ? 'var(--color-brand-green)' : 'var(--color-border)' }}
+          onClick={() => setDryRun(v => !v)}
+        >
+          <div
+            className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+            style={{ transform: dryRun ? 'translateX(1.25rem)' : 'translateX(0.125rem)' }}
+          />
+        </div>
+        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          {dryRun ? '🧪 Simulation Mode' : '🚀 Production Mode'}
+        </span>
+      </label>
 
       {/* Use Mock Data Button */}
       <button
@@ -103,7 +125,7 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
         onClick={handleMockData}
         disabled={isLoading}
       >
-        Gunakan Mock Data
+        Use Mock Data
       </button>
 
       {/* Upload JSON Button */}

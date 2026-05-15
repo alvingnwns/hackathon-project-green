@@ -124,7 +124,7 @@ function App() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setPreviewURL(URL.createObjectURL(e.target.files[0]));
-      setResultData(null); // Reset hasil saat pilih gambar baru
+      setResultData(null); // Reset result when a new image is selected
     }
   };
 
@@ -145,7 +145,7 @@ function App() {
         // Tampilkan pesan alasan rejection dari backend (is_already_green)
         alert("INFO: " + error.response.data.detail);
       } else {
-        alert("Terjadi kesalahan sistem saat memproses gambar.");
+        alert("A system error occurred while processing the image.");
       }
     } finally {
       setIsLoading(false);
@@ -167,10 +167,10 @@ function App() {
         if (parsedJSON.assets) {
           setResultData(parsedJSON);
         } else {
-          alert("Format JSON sepertinya tidak sesuai dengan struktur aplikasi.");
+          alert("JSON format does not match the expected application structure.");
         }
       } catch {
-        alert("Gagal membaca file JSON: Format tidak valid.");
+        alert("Failed to read JSON file: Invalid format.");
       }
     };
     reader.readAsText(fileObj);
@@ -226,7 +226,7 @@ function App() {
         {/* Header / Upload Box */}
         <div className="bg-neutral-800/90 backdrop-blur-md p-6 rounded-2xl shadow-xl w-full pointer-events-auto border border-neutral-700 shrink-0">
           <h1 className="text-2xl font-bold mb-2 text-emerald-400">Green Landscape AI</h1>
-          <p className="text-sm text-neutral-300 mb-6">Unggah foto lahan kosong untuk melihat transformasi desain lanskap 3D secara presisi.</p>
+          <p className="text-sm text-neutral-300 mb-6">Upload a photo of an empty lot to see a precise 3D landscape design transformation.</p>
           
           <input 
             type="file" 
@@ -242,14 +242,14 @@ function App() {
               !file || isLoading ? "bg-neutral-600 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02]"
             }`}
           >
-            {isLoading ? "Memproses AI (Memakan waktu)..." : "Mulai Generate Desain!"}
+            {isLoading ? "Processing with AI (this may take a while)..." : "Generate Design!"}
           </button>
           
           <button 
             onClick={handleUseMockData}
             className="w-full py-2 mb-2 rounded-lg font-bold text-emerald-300 border border-emerald-500 hover:bg-emerald-900/50 transition-all shadow-lg"
           >
-            Gunakan Data JSON Lokal (Hemat API)
+            Use Local JSON Data (Save API Credits)
           </button>
 
           <label className="w-full py-2 rounded-lg font-bold text-neutral-300 border border-neutral-500 hover:bg-neutral-700/50 transition-all shadow-lg cursor-pointer flex justify-center items-center text-center">
@@ -266,8 +266,8 @@ function App() {
         {/* Results Info Overlay */}
         {resultData && (
           <div className="bg-neutral-800/90 backdrop-blur-md p-6 rounded-2xl shadow-xl w-full pointer-events-auto border border-emerald-800/50 shrink-0 flex-1 flex flex-col min-h-0">
-             <h2 className="text-lg font-bold text-emerald-300 mb-1 leading-tight">{resultData.project_context?.concept || "Konsep Lanskap"}</h2>
-             <p className="text-xs text-emerald-500/70 font-semibold mb-4">Total Aset: {resultData.assets?.length || 0} Model 3D</p>
+             <h2 className="text-lg font-bold text-emerald-300 mb-1 leading-tight">{resultData.project_context?.concept || "Landscape Concept"}</h2>
+             <p className="text-xs text-emerald-500/70 font-semibold mb-4">Total Assets: {resultData.assets?.length || 0} 3D Models</p>
              
              {/* List Asset */}
              <div className="overflow-y-auto pr-2 flex-1 space-y-3">
