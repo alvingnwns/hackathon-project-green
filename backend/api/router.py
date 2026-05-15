@@ -1,6 +1,6 @@
 import io
 import json
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query
 from PIL import Image
 from pillow_heif import register_heif_opener
 from core.config import settings
@@ -16,8 +16,16 @@ import numpy as np
 register_heif_opener()
 router = APIRouter()
 
+# Stock GLB pool used for dry_run mode (no Meshy credits consumed)
+SUPABASE_PUBLIC = "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models"
+STOCK_MODELS = [
+    f"{SUPABASE_PUBLIC}/integrated_vertical_greenhouse_fc0b529a.glb",
+    f"{SUPABASE_PUBLIC}/industrial_solar_panel_array_o_8eb8e6cd.glb",
+    f"{SUPABASE_PUBLIC}/set_of_three_color-coded_recyc_4debc1f8.glb",
+]
+
 @router.post("/process-landscape")
-async def process_landscape(file: UploadFile = File(...)):
+async def process_landscape(file: UploadFile = File(...), dry_run: bool = Query(False, description="Skip Meshy API — use stock GLBs instead")):
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Format file tidak didukung.")
 
@@ -111,7 +119,15 @@ async def process_landscape(file: UploadFile = File(...)):
         # Call Meshy only for non-base items
         meshy_results = []
         if prompts_to_generate:
-            meshy_results = await generate_multiple_models(prompts_to_generate)
+            if dry_run:
+                # Dry run: skip Meshy, cycle through stock GLBs
+                print("🧪 [DRY RUN] Melewati Meshy API — menggunakan stock GLBs.")
+                meshy_results = [
+                    {"model_url": STOCK_MODELS[i % len(STOCK_MODELS)]}
+                    for i in range(len(prompts_to_generate))
+                ]
+            else:
+                meshy_results = await generate_multiple_models(prompts_to_generate)
 
         # map results back to processed_components using prompts_to_pc_index
         result_by_pc_index = {}
@@ -133,7 +149,8 @@ async def process_landscape(file: UploadFile = File(...)):
                 else:
                     model_url = res.get("model_url")
                     if model_url:
-                        final_url = await upload_meshy_to_supabase(comp["name"], model_url)
+                        # dry_run: stock URLs are already public, skip re-uploading
+                        final_url = model_url if dry_run else await upload_meshy_to_supabase(comp["name"], model_url)
                     else:
                         final_url = None
 
