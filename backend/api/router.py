@@ -45,6 +45,10 @@ async def process_landscape(file: UploadFile = File(...)):
         # Proses pipeline paralel untuk Multi-Object
         processed_components = []
         prompts_to_generate = []
+        prompts_to_pc_index = []  # mapping from prompt index -> processed_components index
+
+        # Optional: reuse a static base land model from Supabase to save Meshy credits
+        BASE_LAND_URL = "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/flat_permaculture_soil_base_wi_c5e93b92.glb"
 
         if not components:
             # Fallback jika kosong
@@ -78,43 +82,68 @@ async def process_landscape(file: UploadFile = File(...)):
             
             spatial_data = extract_depth_at_pixel(img, target_u, target_v)
 
-            # Simpan sementara komponen yang sudah punya koordinat
+            # record original item id from Gemini (if present) to detect base
+            original_item_id = item.get("id")
+            pc_index = len(processed_components)
             processed_components.append({
                 "id": idx,
+                "original_id": original_item_id,
                 "name": prompt_3d,
                 "description": item.get("description", ""),
                 "visual_data": vision_data,
                 "spatial_data": spatial_data,
-                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]) # Fallback scale default
+                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]), # Fallback scale default
+                "position_hint": item.get("position_hint", "center") # Hint posisi grid dari Gemini
             })
+
+            # If this component is the base/land (Gemini id == 1 or first item), DO NOT request Meshy.
+            # We'll reuse the pre-uploaded Supabase GLB to save credits.
+            if original_item_id == 1 or idx == 0:
+                # skip adding to prompts_to_generate
+                continue
+
+            # otherwise queue for Meshy generation and map prompt->processed_components index
             prompts_to_generate.append(prompt_3d)
+            prompts_to_pc_index.append(pc_index)
 
         # --- NODE 4: Generating 3D Models in Parallel ---
         print(f"➡️ Menjalankan Node 4: Generating {len(prompts_to_generate)} 3D Models secara PARALEL...")
-        meshy_results = await generate_multiple_models(prompts_to_generate)
+        # Call Meshy only for non-base items
+        meshy_results = []
+        if prompts_to_generate:
+            meshy_results = await generate_multiple_models(prompts_to_generate)
 
-        # Menggabungkan hasil Meshy kembali ke processed_components
-        final_assets = []
+        # map results back to processed_components using prompts_to_pc_index
+        result_by_pc_index = {}
         for i, res in enumerate(meshy_results):
-            comp = processed_components[i]
-            
-            if isinstance(res, Exception):
-                print(f"❌ Error rendering {comp['name']}: {res}")
-                model_url = None
-                final_url = None
+            pc_idx = prompts_to_pc_index[i]
+            result_by_pc_index[pc_idx] = res
+
+        # Menggabungkan semua hasil (menggunakan BASE_LAND_URL for base)
+        final_assets = []
+        for pc_idx, comp in enumerate(processed_components):
+            # If component is base (original_id==1 or id==0), use static BASE_LAND_URL
+            if comp.get("original_id") == 1 or comp.get("id") == 0:
+                final_url = BASE_LAND_URL
             else:
-                model_url = res.get("model_url")
-                # Jika kita dapat model_url dari Meshy, segera upload ke Supabase
-                if model_url:
-                    final_url = await upload_meshy_to_supabase(comp["name"], model_url)
-                else:
+                res = result_by_pc_index.get(pc_idx)
+                if isinstance(res, Exception) or res is None:
+                    print(f"❌ Error rendering {comp['name']}: {res}")
                     final_url = None
-                
+                else:
+                    model_url = res.get("model_url")
+                    if model_url:
+                        final_url = await upload_meshy_to_supabase(comp["name"], model_url)
+                    else:
+                        final_url = None
+
             final_assets.append({
                 "asset_id": comp["id"],
                 "name": comp["name"],
                 "description": comp["description"],
-                "model_url": final_url, # Gunakan URL Supabase di database / JSON balasan
+                "model_url": final_url,
+                "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),  # Skala proporsional dari Gemini reasoning
+                "position_hint": comp.get("position_hint", "center"), # Hint posisi grid dari Gemini
                 "spatial_data": comp["spatial_data"],
                 "vision_detection": comp["visual_data"]
             })

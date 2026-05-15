@@ -30,39 +30,41 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// === Sistem Posisi Grid 3x3 ===
+// Dikalkulasi dari rumus: 3 baris × 3 kolom dengan jarak GRID_SPACING meter.
+// Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari nama posisi.
+const GRID_SPACING = 2.5;
+const GRID_POSITIONS = Object.fromEntries(
+  ["top", "center", "bottom"].flatMap((row, ri) =>
+    ["left", "center", "right"].map((col, ci) => {
+      const key = row === "center" && col === "center" ? "center" : `${row}-${col}`;
+      return [key, [(ci - 1) * GRID_SPACING, (ri - 1) * GRID_SPACING]];
+    })
+  )
+);
+const FALLBACK_HINTS = Object.keys(GRID_POSITIONS);
+
 // Komponen Sub untuk Me-render file GLB satuan
-function GLTFModel({ url, positionJSON, index, scaleJSON, clusterCenter }) {
-  // Pemuat GLTF (cached otomatis oleh Drei)
+function GLTFModel({ url, index, scaleJSON, positionHint, clusterCenter }) {
   const { scene } = useGLTF(url);
-  
-  // Ambil data X, Y, Z dari Backend (Depth Engine) dengan optional chaining
-  // Tambahkan faktor pengali (multiplier) yang lebih besar agar jarak spasial lebih terpisah secara arsitektural (spread out)
-  const rawX = positionJSON?.X_meter || 0;
-  const rawZ = positionJSON?.Z_meter || 5;
-
-  let finalX = rawX * 3.0; 
-  let finalZ = -rawZ * 2.5; 
-
-  // Cek apakah ini Base Ground (Lahan). Di JSON, id bisa 0 atau 1, tapi biasanya elemen paling pertama adalah alas.
   const isBase = index === 0;
 
+  // Tentukan slot grid berdasarkan positionHint dari Gemini.
+  // Jika hint tidak valid, fallback ke slot urutan berdasarkan index agar tidak overlap.
+  const hint = (!isBase && positionHint && GRID_POSITIONS[positionHint])
+    ? positionHint
+    : FALLBACK_HINTS[Math.max(0, index - 1) % FALLBACK_HINTS.length];
+
+  let finalX = isBase ? 0 : GRID_POSITIONS[hint][0];
+  let finalZ = isBase ? 0 : GRID_POSITIONS[hint][1];
+
   // Rotasi acak antara -10 hingga 10 derajat untuk objek selain base
-  // Dibungkus useState agar tidak dicomplain React Compiler (Math.random is impure during render)
   const [randomRotationY] = useState(() => {
     if (isBase) return 0;
     const min = -10 * (Math.PI / 180);
     const max = 10 * (Math.PI / 180);
     return Math.random() * (max - min) + min;
   });
-
-  // Fallback Grid Arsitektural: 
-  if (!isBase) {
-    // Buat formasi U-shape atau Grid Box
-    const col = (index - 1) % 3; 
-    const row = Math.floor((index - 1) / 3);
-    finalX = finalX + ((col - 1) * 2.5);
-    finalZ = finalZ - (row * 2.5);
-  }
 
   // Skala dinamis
   let scaleArr = Array.isArray(scaleJSON) ? scaleJSON : [1, 1, 1];
@@ -72,7 +74,7 @@ function GLTFModel({ url, positionJSON, index, scaleJSON, clusterCenter }) {
       finalX = clusterCenter[0];
       finalZ = clusterCenter[2];
     }
-    // Pastikan alas (lahan) minimal melebar jauh untuk mencakup area. 
+    // Lahan ditarik kembali ukurannya secara compact di 8x8 meter seperti arahan awal!
     scaleArr = [
       Math.max(scaleArr[0], 8.0), 
       5, 
@@ -161,40 +163,15 @@ function App() {
         } else {
           alert("Format JSON sepertinya tidak sesuai dengan struktur aplikasi.");
         }
-      } catch (error) {
+      } catch {
         alert("Gagal membaca file JSON: Format tidak valid.");
       }
     };
     reader.readAsText(fileObj);
   };
 
-  // Kalkulasi target kamera yang akurat di tengah-tengah seluruh objek yang degenerate
-  const getCameraTarget = () => {
-    if (!resultData?.assets || resultData.assets.length === 0) return [0, -2, 0];
-    let sumX = 0;
-    let sumZ = 0;
-    let validCount = 0;
-
-    resultData.assets.forEach((asset, index) => {
-      const pos = asset.spatial_data?.spatial_3d_coordinates;
-      if (pos) {
-        const x = (pos.X_meter || 0) * 1.5; 
-        const finalX = Math.abs(x) < 0.1 ? (index % 3 - 1) * 2 : x;
-        const z = -(pos.Z_meter || 5) * 1.5 - ((Math.floor(index / 3)) * 1.5);
-        sumX += finalX;
-        sumZ += z;
-        validCount++;
-      }
-    });
-
-    if (validCount === 0) return [0, -2, 0];
-    // Offset orbit anchor sedikit ke belakang dan turun (karena anchor y=-2)
-    return [sumX / validCount, -2, sumZ / validCount];
-  };
-
-  const cameraTarget = getCameraTarget();
-  const baseAsset = resultData?.assets?.find(a => a.asset_id === 0);
-  const baseAnchorY = baseAsset?.spatial_data?.spatial_3d_coordinates?.Y_meter || 0;
+  // Grid 3x3 terpusat di origin — kamera selalu mengarah ke pusat scene
+  const cameraTarget = [0, -2, 0];
 
   return (
     <div className="relative w-screen h-screen bg-neutral-900 text-white overflow-hidden">
@@ -224,13 +201,10 @@ function App() {
                 <ErrorBoundary key={index}>
                   <GLTFModel 
                     url={asset.model_url} 
-                    // Ambil koordinat 'relative_position' yang dibuat Gemini
-                    positionJSON={asset.spatial_data?.spatial_3d_coordinates} 
                     index={index}
-                    // Ambil 'scale_3d' yang sudah dipikirkan rasionya oleh Gemini
                     scaleJSON={asset.scale_3d}
+                    positionHint={asset.position_hint}
                     clusterCenter={cameraTarget}
-                    baseAnchorY={baseAnchorY}
                   />
                 </ErrorBoundary>
               );
