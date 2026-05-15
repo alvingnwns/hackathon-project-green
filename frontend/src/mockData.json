@@ -1,201 +1,271 @@
 {
-    "status":  "success",
-    "project_context":  {
-                            "concept":  "Regenerative Bio-Hub",
-                            "gemini_full_report":  {
-                                                       "analysis":  {
-                                                                        "land_size_est":  "Approximately 2.5 hectares (25,000 m2)",
-                                                                        "building_condition":  "Primarily vacant land with minimal vegetation; background industrial structures appear stable but are outside the primary intervention zone.",
-                                                                        "structural_decision":  "Augment",
-                                                                        "reasoning":  "The site is an empty field with cleared topsoil. There are no existing structures within the foreground to demolish or retain. Augmentation with sustainable permaculture infrastructure is the lowest-cost and most carbon-efficient method to restore soil health and productivity without the need for heavy demolition."
-                                                                    },
-                                                       "green_solution":  {
-                                                                              "concept_name":  "Regenerative Bio-Hub",
-                                                                              "description":  "A low-impact permaculture system utilizing keyline design for water retention, high-density food forests, and circular composting. We will use bamboo and recycled polymer composites instead of timber to preserve forest resources.",
-                                                                              "estimated_cost":  450000000,
-                                                                              "waste_management":  "Since no demolition is required, waste management focuses on biomass. Existing weeds and shrubs will be processed into onsite mulch and compost to enrich the soil naturally."
-                                                                          },
-                                                       "image_gen_prompt":  "A wide-angle photorealistic landscape of a lush permaculture farm transformed from a dry field. Foreground features organized garden swales and diverse food forests. A modern greenhouse made of bamboo and glass stands in the middle ground. Solar panels on minimalist metal stands are visible. Background shows misty tropical hills under a soft overcast sky. High detail, 8k resolution, architectural visualization style.",
-                                                       "components_for_3d":  [
-                                                                                 {
-                                                                                     "id":  1,
-                                                                                     "to_generate":  "Modular Bamboo Greenhouse: A structure with a curved bamboo frame and translucent polycarbonate panels for seedling propagation.",
-                                                                                     "target_area":  "dirt ground",
-                                                                                     "position_hint":  "middle"
-                                                                                 },
-                                                                                 {
-                                                                                     "id":  2,
-                                                                                     "to_generate":  "Industrial Bio-Digester: A large, matte green cylindrical tank made from recycled plastic for organic waste processing.",
-                                                                                     "target_area":  "dirt ground",
-                                                                                     "position_hint":  "right"
-                                                                                 },
-                                                                                 {
-                                                                                     "id":  3,
-                                                                                     "to_generate":  "Solar-Powered Irrigation Hub: A small elevated platform holding water tanks and a compact array of monocrystalline solar panels.",
-                                                                                     "target_area":  "dirt ground",
-                                                                                     "position_hint":  "left"
-                                                                                 },
-                                                                                 {
-                                                                                     "id":  4,
-                                                                                     "to_generate":  "Raised Permaculture Swales: Linear mounds of earth and mulch planted with various herbs and vegetables to prevent erosion.",
-                                                                                     "target_area":  "grass",
-                                                                                     "position_hint":  "bottom"
-                                                                                 }
-                                                                             ]
-                                                   }
-                        },
-    "assets":  [
-                   {
-                       "asset_id":  0,
-                       "name":  "Modular Bamboo Greenhouse: A structure with a curved bamboo frame and translucent polycarbonate panels for seedling propagation.",
-                       "description":  "",
-                       "model_url":  "/past_glbs/model (2).glb",
-                       "spatial_data":  {
-                                            "image_resolution":  "640x360",
-                                            "camera_metadata":  {
-                                                                    "estimated_fov_degrees":  70,
-                                                                    "is_fallback":  true
-                                                                },
-                                            "target_coordinate":  {
-                                                                      "u":  319,
-                                                                      "v":  252
-                                                                  },
-                                            "raw_depth_Z":  101,
-                                            "spatial_3d_coordinates":  {
-                                                                           "X_meter":  0,
-                                                                           "Y_meter":  0.08,
-                                                                           "Z_meter":  -2
-                                                                       },
-                                            "source":  "Local Inference (GPU (CUDA))"
-                                        },
-                       "vision_detection":  {
-                                                "label":  "dirt ground",
-                                                "confidence":  0.53,
-                                                "bounding_box":  {
-                                                                     "xmin":  1,
-                                                                     "ymin":  146,
-                                                                     "xmax":  639,
-                                                                     "ymax":  359
-                                                                 },
-                                                "center_coordinate":  {
-                                                                          "u":  319,
-                                                                          "v":  252
-                                                                      }
-                                            }
-                   },
-                   {
-                       "asset_id":  1,
-                       "name":  "Industrial Bio-Digester: A large, matte green cylindrical tank made from recycled plastic for organic waste processing.",
-                       "description":  "",
-                       "model_url":  "/past_glbs/model (3).glb",
-                       "spatial_data":  {
-                                            "image_resolution":  "640x360",
-                                            "camera_metadata":  {
-                                                                    "estimated_fov_degrees":  70,
-                                                                    "is_fallback":  true
-                                                                },
-                                            "target_coordinate":  {
-                                                                      "u":  319,
-                                                                      "v":  252
-                                                                  },
-                                            "raw_depth_Z":  101,
-                                            "spatial_3d_coordinates":  {
-                                                                           "X_meter":  3,
-                                                                           "Y_meter":  0.08,
-                                                                           "Z_meter":  1
-                                                                       },
-                                            "source":  "Local Inference (GPU (CUDA))"
-                                        },
-                       "vision_detection":  {
-                                                "label":  "dirt ground",
-                                                "confidence":  0.53,
-                                                "bounding_box":  {
-                                                                     "xmin":  1,
-                                                                     "ymin":  146,
-                                                                     "xmax":  639,
-                                                                     "ymax":  359
-                                                                 },
-                                                "center_coordinate":  {
-                                                                          "u":  319,
-                                                                          "v":  252
-                                                                      }
-                                            }
-                   },
-                   {
-                       "asset_id":  2,
-                       "name":  "Solar-Powered Irrigation Hub: A small elevated platform holding water tanks and a compact array of monocrystalline solar panels.",
-                       "description":  "",
-                       "model_url":  "/past_glbs/model (4).glb",
-                       "spatial_data":  {
-                                            "image_resolution":  "640x360",
-                                            "camera_metadata":  {
-                                                                    "estimated_fov_degrees":  70,
-                                                                    "is_fallback":  true
-                                                                },
-                                            "target_coordinate":  {
-                                                                      "u":  319,
-                                                                      "v":  252
-                                                                  },
-                                            "raw_depth_Z":  101,
-                                            "spatial_3d_coordinates":  {
-                                                                           "X_meter":  -3,
-                                                                           "Y_meter":  0.08,
-                                                                           "Z_meter":  -1
-                                                                       },
-                                            "source":  "Local Inference (GPU (CUDA))"
-                                        },
-                       "vision_detection":  {
-                                                "label":  "dirt ground",
-                                                "confidence":  0.53,
-                                                "bounding_box":  {
-                                                                     "xmin":  1,
-                                                                     "ymin":  146,
-                                                                     "xmax":  639,
-                                                                     "ymax":  359
-                                                                 },
-                                                "center_coordinate":  {
-                                                                          "u":  319,
-                                                                          "v":  252
-                                                                      }
-                                            }
-                   },
-                   {
-                       "asset_id":  3,
-                       "name":  "Raised Permaculture Swales: Linear mounds of earth and mulch planted with various herbs and vegetables to prevent erosion.",
-                       "description":  "",
-                       "model_url":  "/past_glbs/model (5).glb",
-                       "spatial_data":  {
-                                            "image_resolution":  "640x360",
-                                            "camera_metadata":  {
-                                                                    "estimated_fov_degrees":  70,
-                                                                    "is_fallback":  true
-                                                                },
-                                            "target_coordinate":  {
-                                                                      "u":  320,
-                                                                      "v":  252
-                                                                  },
-                                            "raw_depth_Z":  101,
-                                            "spatial_3d_coordinates":  {
-                                                                           "X_meter":  0,
-                                                                           "Y_meter":  0.08,
-                                                                           "Z_meter":  3
-                                                                       },
-                                            "source":  "Local Inference (GPU (CUDA))"
-                                        },
-                       "vision_detection":  {
-                                                "label":  "grass",
-                                                "confidence":  0.84,
-                                                "bounding_box":  {
-                                                                     "xmin":  1,
-                                                                     "ymin":  145,
-                                                                     "xmax":  639,
-                                                                     "ymax":  359
-                                                                 },
-                                                "center_coordinate":  {
-                                                                          "u":  320,
-                                                                          "v":  252
-                                                                      }
-                                            }
-                   }
-               ]
+  "assets": [
+    {
+      "name": "Flat permaculture soil base with painted 2D green grass texture and gravel walkways.",
+      "asset_id": 0,
+      "scale_3d": [
+        8,
+        0.5,
+        8
+      ],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/flat_permaculture_soil_base_wi_c5e93b92.glb",
+      "description": "",
+      "spatial_data": {
+        "source": "Local Inference (GPU (CUDA))",
+        "raw_depth_Z": 76,
+        "camera_metadata": {
+          "is_fallback": true,
+          "estimated_fov_degrees": 70
+        },
+        "image_resolution": "750x505",
+        "target_coordinate": {
+          "u": 340,
+          "v": 448
+        },
+        "spatial_3d_coordinates": {
+          "X_meter": -0.04,
+          "Y_meter": 0.24,
+          "Z_meter": 0.65
+        }
+      },
+      "position_hint": "center",
+      "vision_detection": {
+        "label": "dirt and weed covered ground",
+        "confidence": 0.29,
+        "bounding_box": {
+          "xmax": 673,
+          "xmin": 8,
+          "ymax": 492,
+          "ymin": 405
+        },
+        "center_coordinate": {
+          "u": 340,
+          "v": 448
+        }
+      }
+    },
+    {
+      "name": "Integrated vertical greenhouse structure with glass panels and timber frames fitted within the concrete skeleton.",
+      "asset_id": 1,
+      "scale_3d": [
+        5,
+        4,
+        4.5
+      ],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/integrated_vertical_greenhouse_fc0b529a.glb",
+      "description": "",
+      "spatial_data": {
+        "source": "Local Inference (GPU (CUDA))",
+        "raw_depth_Z": 47,
+        "camera_metadata": {
+          "is_fallback": true,
+          "estimated_fov_degrees": 70
+        },
+        "image_resolution": "750x505",
+        "target_coordinate": {
+          "u": 386,
+          "v": 288
+        },
+        "spatial_3d_coordinates": {
+          "X_meter": 0.02,
+          "Y_meter": 0.07,
+          "Z_meter": 1.04
+        }
+      },
+      "position_hint": "center",
+      "vision_detection": {
+        "label": "concrete building frame",
+        "confidence": 0.86,
+        "bounding_box": {
+          "xmax": 746,
+          "xmin": 28,
+          "ymax": 450,
+          "ymin": 127
+        },
+        "center_coordinate": {
+          "u": 386,
+          "v": 288
+        }
+      }
+    },
+    {
+      "name": "Industrial solar panel array on a tilted metal mount.",
+      "asset_id": 2,
+      "scale_3d": [
+        1.8,
+        1.2,
+        1.5
+      ],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/industrial_solar_panel_array_o_8eb8e6cd.glb",
+      "description": "",
+      "spatial_data": {
+        "source": "Local Inference (GPU (CUDA))",
+        "raw_depth_Z": 43,
+        "camera_metadata": {
+          "is_fallback": true,
+          "estimated_fov_degrees": 70
+        },
+        "image_resolution": "750x505",
+        "target_coordinate": {
+          "u": 627,
+          "v": 182
+        },
+        "spatial_3d_coordinates": {
+          "X_meter": 0.53,
+          "Y_meter": -0.15,
+          "Z_meter": 1.14
+        }
+      },
+      "position_hint": "top-right",
+      "vision_detection": {
+        "label": "building rooftop",
+        "confidence": 0.51,
+        "bounding_box": {
+          "xmax": 747,
+          "xmin": 27,
+          "ymax": 452,
+          "ymin": 128
+        },
+        "center_coordinate": {
+          "u": 627,
+          "v": 182
+        }
+      }
+    },
+    {
+      "name": "Set of three color-coded recycled plastic compost and waste bins.",
+      "asset_id": 3,
+      "scale_3d": [
+        0.4,
+        0.6,
+        0.4
+      ],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/set_of_three_color-coded_recyc_4debc1f8.glb",
+      "description": "",
+      "spatial_data": {
+        "source": "Local Inference (GPU (CUDA))",
+        "raw_depth_Z": 45,
+        "camera_metadata": {
+          "is_fallback": true,
+          "estimated_fov_degrees": 70
+        },
+        "image_resolution": "750x505",
+        "target_coordinate": {
+          "u": 150,
+          "v": 384
+        },
+        "spatial_3d_coordinates": {
+          "X_meter": -0.46,
+          "Y_meter": 0.27,
+          "Z_meter": 1.09
+        }
+      },
+      "position_hint": "bottom-left",
+      "vision_detection": {
+        "label": "ground near the entrance",
+        "confidence": 0.34,
+        "bounding_box": {
+          "xmax": 745,
+          "xmin": 32,
+          "ymax": 435,
+          "ymin": 133
+        },
+        "center_coordinate": {
+          "u": 150,
+          "v": 384
+        }
+      }
+    }
+  ],
+  "status": "success",
+  "project_context": {
+    "concept": "Vertical Bio-Skeleton Farm",
+    "gemini_full_report": {
+      "analysis": {
+        "reasoning": "Demolishing a reinforced concrete structure of this size would incur massive costs and high carbon emissions. The existing concrete frame is ideal for supporting heavy hydroponic systems, vertical trellises, and rainwater harvesting tanks. By keeping the 'bones', we save on structural materials.",
+        "land_size_est": "500 - 700 square meters",
+        "building_condition": "Abandoned reinforced concrete skeleton, two floors, exposed rebar, structural integrity appears stable but unfinished with significant weed growth at the base.",
+        "structural_decision": "Augment"
+      },
+      "green_solution": {
+        "description": "Repurposing the abandoned concrete shell into a multi-level permaculture hub. The ground floor will serve as a mushroom cultivation and composting center, the second floor for hydroponic leafy greens, and the rooftop for solar energy and rainwater collection.",
+        "concept_name": "Vertical Bio-Skeleton Farm",
+        "estimated_cost": 85000000,
+        "waste_management": "Existing wooden scaffolding debris will be chipped into mulch for the garden beds. Exposed rebar will be treated and used as climbing structures for vine-based vegetables like passion fruit or beans."
+      },
+      "image_gen_prompt": "A photorealistic landscape view of an abandoned concrete building shell transformed into a lush vertical permaculture farm. Vibrant green vines climbing concrete pillars, glass-enclosed greenhouse sections on the top floor, wooden planter boxes made from recycled materials, solar panels on the roof, and a clean gravel path around the base, soft cinematic daylight.",
+      "is_already_green": false,
+      "rejection_reason": "",
+      "components_for_3d": [
+        {
+          "id": 1,
+          "scale_3d": [
+            8,
+            0.5,
+            8
+          ],
+          "target_area": "dirt and weed covered ground",
+          "to_generate": "Flat permaculture soil base with painted 2D green grass texture and gravel walkways.",
+          "position_hint": "center",
+          "scale_reasoning": "This is the mandatory foundation layer. It is a completely flat geometry to serve as the ground plane for all other objects.",
+          "relative_position": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "scale_3d": [
+            5,
+            4,
+            4.5
+          ],
+          "target_area": "concrete building frame",
+          "to_generate": "Integrated vertical greenhouse structure with glass panels and timber frames fitted within the concrete skeleton.",
+          "position_hint": "center",
+          "scale_reasoning": "The largest component. As the primary building, its scale [5.0, 4.0, 4.5] reflects a real-world size of roughly 15x12 meters, matching the footprint of the existing concrete carcass.",
+          "relative_position": [
+            0,
+            2.25,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "scale_3d": [
+            1.8,
+            1.2,
+            1.5
+          ],
+          "target_area": "building rooftop",
+          "to_generate": "Industrial solar panel array on a tilted metal mount.",
+          "position_hint": "top-right",
+          "scale_reasoning": "A medium-sized object. In reality, a solar array is significantly smaller than a building but larger than furniture, hence the ~1.8m scale.",
+          "relative_position": [
+            2,
+            4.5,
+            -1.5
+          ]
+        },
+        {
+          "id": 4,
+          "scale_3d": [
+            0.4,
+            0.6,
+            0.4
+          ],
+          "target_area": "ground near the entrance",
+          "to_generate": "Set of three color-coded recycled plastic compost and waste bins.",
+          "position_hint": "bottom-left",
+          "scale_reasoning": "Smallest component. These bins are approximately 1/10th the height of the main building columns, matching real-world proportions.",
+          "relative_position": [
+            -3,
+            0.5,
+            3
+          ]
+        }
+      ]
+    }
+  }
 }

@@ -48,3 +48,33 @@ async def upload_meshy_to_supabase(asset_name: str, meshy_url: str) -> str:
     except Exception as e:
         print(f"❌ Terjadi kesalahan saat upload ke Supabase: {e}")
         return meshy_url
+
+def save_project_to_db(payload: dict) -> dict:
+    """
+    Menyimpan metadata project dan raw JSON ke tabel 'projects' di Supabase Database.
+    Kita menyimpan key penting (concept, cost) terpisah, dan json utuhnya sebagai JSONB.
+    """
+    if not supabase:
+        print("⚠️ Supabase belum di-setup, melewati proses simpan ke database.")
+        return None
+        
+    try:
+        # Ekstrak dari Project Context
+        full_report = payload.get("project_context", {}).get("gemini_full_report", {})
+        concept = payload.get("project_context", {}).get("concept", "Untitled Project")
+        cost = full_report.get("green_solution", {}).get("estimated_cost", 0)
+        
+        # Susun payload untuk tabel PostgreSQL.
+        # Catatan: User harus membuat tabel 'projects' di Supabase SQL Editor.
+        db_payload = {
+            "concept_name": concept,
+            "estimated_cost": cost,
+            "raw_json": payload  # Menyimpan seluruh history struktur XYZ & GLB URL
+        }
+        
+        print("💾 Menyimpan metadata dan JSON ke Supabase Database...")
+        response = supabase.table("projects").insert(db_payload).execute()
+        return response.data
+    except Exception as e:
+        print(f"❌ Gagal menyimpan JSON ke database Supabase: {e}")
+        return None

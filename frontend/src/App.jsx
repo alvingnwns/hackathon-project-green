@@ -1,5 +1,6 @@
-import React, { useState, Suspense } from "react";
+import React, { useState, Suspense, useMemo } from "react";
 import axios from "axios";
+import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
 import mockData from "./mockData.json";
@@ -29,25 +30,87 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Komponen Sub untuk Me-render file GLB satuan
-function GLTFModel({ url, positionJSON }) {
-  // Pemuat GLTF (cached otomatis oleh Drei)
-  const { scene } = useGLTF(url);
-  
-  // Ambil data X, Y, Z dari Backend (Depth Engine) dengan optional chaining
-  const x = positionJSON?.X_meter || 0;
-  const y = positionJSON?.Y_meter || 0;
-  const z = positionJSON?.Z_meter || -5; // Default agak ke depan kamera
+// === Sistem Posisi Grid 3x3 ===
+// Dikalkulasi dari rumus: 3 baris × 3 kolom dengan jarak GRID_SPACING meter.
+// Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari nama posisi.
+const GRID_SPACING = 3.0;
+const GRID_POSITIONS = Object.fromEntries(
+  ["top", "center", "bottom"].flatMap((row, ri) =>
+    ["left", "center", "right"].map((col, ci) => {
+      const key = row === "center" && col === "center" ? "center" : `${row}-${col}`;
+      return [key, [(ci - 1) * GRID_SPACING, (ri - 1) * GRID_SPACING]];
+    })
+  )
+);
+const FALLBACK_HINTS = Object.keys(GRID_POSITIONS);
 
-  // Pendekatan Arsitektural: Dibuat presisi dan seragam tanpa nilai acak 
-  // agar terlihat seperti maket perancangan kota / master plan yang profesional.
+// Komponen Sub untuk Me-render file GLB satuan
+function GLTFModel({ url, index, scaleJSON, positionHint, clusterCenter }) {
+  const { scene } = useGLTF(url);
+  const isBase = index === 0;
+
+  // Tentukan slot grid berdasarkan positionHint dari Gemini.
+  // Jika hint tidak valid, fallback ke slot urutan berdasarkan index agar tidak overlap.
+  const hint = (!isBase && positionHint && GRID_POSITIONS[positionHint])
+    ? positionHint
+    : FALLBACK_HINTS[Math.max(0, index - 1) % FALLBACK_HINTS.length];
+
+  let finalX = isBase ? 0 : GRID_POSITIONS[hint][0];
+  let finalZ = isBase ? 0 : GRID_POSITIONS[hint][1];
+
+  // Rotasi acak antara -10 hingga 10 derajat untuk objek selain base
+  const [randomRotationY] = useState(() => {
+    if (isBase) return 0;
+    const min = -10 * (Math.PI / 180);
+    const max = 10 * (Math.PI / 180);
+    return Math.random() * (max - min) + min;
+  });
+
+  // Skala dinamis
+  let scaleArr = Array.isArray(scaleJSON) ? scaleJSON : [1, 1, 1];
+  
+  if (isBase) {
+    if (clusterCenter) {
+      finalX = clusterCenter[0];
+      finalZ = clusterCenter[2];
+    }
+    // Lahan ditarik kembali ukurannya secara compact di 8x8 meter seperti arahan awal!
+    scaleArr = [
+      Math.max(scaleArr[0], 8.0), 
+      5, 
+      Math.max(scaleArr[2], 8.0)
+    ]; 
+  }
+
+  const [sx, sy, sz] = scaleArr;
+
+  // Pendekatan Matematika Fundamental: Mencari Bounding Box asli dari 3D Object.
+  // Untuk base: hitung juga center XZ agar model selalu terpusat di world origin,
+  // tidak bergantung pada letak origin internal model GLB (yang sering tidak di tengah).
+  const { clonedScene, offsetY, xzOffset } = useMemo(() => {
+    const clone = scene.clone();
+    clone.scale.set(sx, sy, sz);
+    clone.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(clone);
+    const objectBottom = box.min.y;
+    const objectTop = box.max.y;
+    const GROUND_LEVEL = -2.0;
+    
+    const calculatedOffset = isBase ? (GROUND_LEVEL - objectTop) : (GROUND_LEVEL - objectBottom);
+
+    // Hitung geser XZ agar model base selalu berpusat di (0, _, 0)
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    const xzOffset = isBase ? [-cx, -cz] : [0, 0];
+    
+    return { clonedScene: clone, offsetY: calculatedOffset, xzOffset };
+  }, [scene, sx, sy, sz, isBase]);
+
   return (
-    <primitive 
-      object={scene.clone()} // Clone agar bisa dipakai berulang jika model sama
-      position={[x, y, z]} 
-      rotation={[0, 0, 0]} // Semua menghadap arah grid secara teratur
-      scale={[1, 1, 1]}    // Skala 1:1 sesuai metrik asli objeknya
-    />
+    <group position={[finalX + xzOffset[0], offsetY, finalZ + xzOffset[1]]}>
+      <primitive object={clonedScene} rotation={[0, randomRotationY, 0]} />
+    </group>
   );
 }
 
@@ -61,7 +124,7 @@ function App() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setPreviewURL(URL.createObjectURL(e.target.files[0]));
-      setResultData(null); // Reset hasil saat pilih gambar baru
+      setResultData(null); // Reset result when a new image is selected
     }
   };
 
@@ -78,7 +141,12 @@ function App() {
       setResultData(res.data);
     } catch (error) {
       console.error("Error processing landscape:", error);
-      alert("Terjadi kesalahan saat memproses gambar.");
+      if (error.response && error.response.status === 400 && error.response.data?.detail) {
+        // Tampilkan pesan alasan rejection dari backend (is_already_green)
+        alert("INFO: " + error.response.data.detail);
+      } else {
+        alert("A system error occurred while processing the image.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +155,29 @@ function App() {
   const handleUseMockData = () => {
     setResultData(mockData);
   };
+
+  const handleJSONUpload = (e) => {
+    const fileObj = e.target.files[0];
+    if (!fileObj) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsedJSON = JSON.parse(event.target.result);
+        if (parsedJSON.assets) {
+          setResultData(parsedJSON);
+        } else {
+          alert("JSON format does not match the expected application structure.");
+        }
+      } catch {
+        alert("Failed to read JSON file: Invalid format.");
+      }
+    };
+    reader.readAsText(fileObj);
+  };
+
+  // Grid 3x3 terpusat di origin — kamera selalu mengarah ke pusat scene
+  const cameraTarget = [0, -2, 0];
 
   return (
     <div className="relative w-screen h-screen bg-neutral-900 text-white overflow-hidden">
@@ -100,29 +191,26 @@ function App() {
             className="absolute inset-0 w-full h-full object-cover opacity-30" 
           />
         )}
-        <Canvas camera={{ position: [0, 5, 10], fov: 60 }}>
+        
+        <Canvas camera={{ position: [cameraTarget[0], cameraTarget[1] + 8, cameraTarget[2] + 15], fov: 60 }}>
           <ambientLight intensity={1.5} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <Environment preset="city" />
-          <OrbitControls makeDefault />
+          <OrbitControls makeDefault target={cameraTarget} />
 
           {/* Render Komponen 3D Asli dari JSON */}
           <Suspense fallback={null}>
             {resultData && resultData.assets?.map((asset, index) => {
-              if (!asset.model_url) return null; // Lewati jika gagal generate
-              
-              // Jika ini URL Meshy (yang kena CORS), proxy lewat backend. 
-              // Jika sudah berada di Supabase (tidak kena CORS), bisa dirender langsung!
-              const isMeshy = asset.model_url.includes("meshy.ai");
-              const safeUrl = isMeshy 
-                ? `http://localhost:8000/api/v1/proxy-glb?url=${encodeURIComponent(asset.model_url)}` 
-                : asset.model_url;
+              if (!asset.model_url) return null;
               
               return (
                 <ErrorBoundary key={index}>
                   <GLTFModel 
-                    url={safeUrl} 
-                    positionJSON={asset.spatial_data?.spatial_3d_coordinates} 
+                    url={asset.model_url} 
+                    index={index}
+                    scaleJSON={asset.scale_3d}
+                    positionHint={asset.position_hint}
+                    clusterCenter={cameraTarget}
                   />
                 </ErrorBoundary>
               );
@@ -138,7 +226,7 @@ function App() {
         {/* Header / Upload Box */}
         <div className="bg-neutral-800/90 backdrop-blur-md p-6 rounded-2xl shadow-xl w-full pointer-events-auto border border-neutral-700 shrink-0">
           <h1 className="text-2xl font-bold mb-2 text-emerald-400">Green Landscape AI</h1>
-          <p className="text-sm text-neutral-300 mb-6">Unggah foto lahan kosong untuk melihat transformasi desain lanskap 3D secara presisi.</p>
+          <p className="text-sm text-neutral-300 mb-6">Upload a photo of an empty lot to see a precise 3D landscape design transformation.</p>
           
           <input 
             type="file" 
@@ -154,22 +242,32 @@ function App() {
               !file || isLoading ? "bg-neutral-600 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02]"
             }`}
           >
-            {isLoading ? "Memproses AI (Memakan waktu)..." : "Mulai Generate Desain!"}
+            {isLoading ? "Processing with AI (this may take a while)..." : "Generate Design!"}
           </button>
           
           <button 
             onClick={handleUseMockData}
-            className="w-full py-2 rounded-lg font-bold text-emerald-300 border border-emerald-500 hover:bg-emerald-900/50 transition-all shadow-lg"
+            className="w-full py-2 mb-2 rounded-lg font-bold text-emerald-300 border border-emerald-500 hover:bg-emerald-900/50 transition-all shadow-lg"
           >
-            Gunakan Data JSON Lokal (Hemat API)
+            Use Local JSON Data (Save API Credits)
           </button>
+
+          <label className="w-full py-2 rounded-lg font-bold text-neutral-300 border border-neutral-500 hover:bg-neutral-700/50 transition-all shadow-lg cursor-pointer flex justify-center items-center text-center">
+            📄 Upload History JSON
+            <input 
+              type="file" 
+              accept=".json" 
+              onChange={handleJSONUpload}
+              className="hidden"
+            />
+          </label>
         </div>
 
         {/* Results Info Overlay */}
         {resultData && (
           <div className="bg-neutral-800/90 backdrop-blur-md p-6 rounded-2xl shadow-xl w-full pointer-events-auto border border-emerald-800/50 shrink-0 flex-1 flex flex-col min-h-0">
-             <h2 className="text-lg font-bold text-emerald-300 mb-1 leading-tight">{resultData.project_context?.concept || "Konsep Lanskap"}</h2>
-             <p className="text-xs text-emerald-500/70 font-semibold mb-4">Total Aset: {resultData.assets?.length || 0} Model 3D</p>
+             <h2 className="text-lg font-bold text-emerald-300 mb-1 leading-tight">{resultData.project_context?.concept || "Landscape Concept"}</h2>
+             <p className="text-xs text-emerald-500/70 font-semibold mb-4">Total Assets: {resultData.assets?.length || 0} 3D Models</p>
              
              {/* List Asset */}
              <div className="overflow-y-auto pr-2 flex-1 space-y-3">
