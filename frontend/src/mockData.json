@@ -1,221 +1,310 @@
 {
   "assets": [
     {
-      "name": "Permaculture soil base with organized stone pathways and patches of clover grass",
+      "name": "Flat permaculture soil base with painted 2D green grass and dirt texture. Completely flat geometry, no 3D grass geometry popping out.",
       "asset_id": 0,
-      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/permaculture_soil_base_with_or_55355ad7.glb",
+      "position_hint": "center",
+      "scale_3d": [8.0, 0.5, 8.0],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/flat_permaculture_soil_base_wi_53b041ab.glb",
       "description": "",
       "spatial_data": {
         "source": "Local Inference (GPU (CUDA))",
-        "raw_depth_Z": 86,
+        "raw_depth_Z": 100,
         "camera_metadata": {
           "is_fallback": true,
           "estimated_fov_degrees": 70
         },
-        "image_resolution": "750x505",
+        "image_resolution": "640x360",
         "target_coordinate": {
-          "u": 339,
-          "v": 477
+          "u": 319,
+          "v": 251
         },
         "spatial_3d_coordinates": {
-          "X_meter": -0.04,
-          "Y_meter": 0.24,
-          "Z_meter": 0.57
+          "X_meter": 0,
+          "Y_meter": 0.08,
+          "Z_meter": 0.5
         }
       },
       "vision_detection": {
-        "label": "dirt ground and weeds",
-        "confidence": 0.28,
+        "label": "dirt and weed covered ground",
+        "confidence": 0.67,
         "bounding_box": {
-          "xmax": 669,
-          "xmin": 10,
-          "ymax": 493,
-          "ymin": 402
+          "xmax": 638,
+          "xmin": 1,
+          "ymax": 358,
+          "ymin": 146
         },
         "center_coordinate": {
-          "u": 339,
-          "v": 477
+          "u": 319,
+          "v": 251
         }
       }
     },
     {
-      "name": "Vertical climbing vine system with wooden trellises wrapping around the structure",
+      "name": "Eco-friendly modular greenhouse made of recycled glass and bamboo frame.",
       "asset_id": 1,
-      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/vertical_climbing_vine_system__81e8ff56.glb",
+      "position_hint": "center",
+      "scale_3d": [2.5, 1.8, 2.0],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/eco-friendly_modular_greenhous_af3adc67.glb",
       "description": "",
       "spatial_data": {
         "source": "Local Inference (GPU (CUDA))",
-        "raw_depth_Z": 49,
+        "raw_depth_Z": 99,
         "camera_metadata": {
           "is_fallback": true,
           "estimated_fov_degrees": 70
         },
-        "image_resolution": "750x505",
+        "image_resolution": "640x360",
         "target_coordinate": {
-          "u": 280,
-          "v": 290
+          "u": 319,
+          "v": 250
         },
         "spatial_3d_coordinates": {
-          "X_meter": -0.18,
-          "Y_meter": 0.07,
-          "Z_meter": 1
+          "X_meter": 0,
+          "Y_meter": 0.08,
+          "Z_meter": 0.5
         }
       },
       "vision_detection": {
-        "label": "grey concrete columns",
-        "confidence": 0.29,
+        "label": "center of the field",
+        "confidence": 0.61,
         "bounding_box": {
-          "xmax": 294,
-          "xmin": 267,
-          "ymax": 411,
-          "ymin": 170
+          "xmax": 638,
+          "xmin": 2,
+          "ymax": 358,
+          "ymin": 144
         },
         "center_coordinate": {
-          "u": 280,
-          "v": 290
+          "u": 319,
+          "v": 250
         }
       }
     },
     {
-      "name": "Solar panel array with integrated rainwater collection tanks",
+      "name": "Industrial-grade solar panel array on a low-profile recycled aluminum rack.",
       "asset_id": 2,
-      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/solar_panel_array_with_integra_f6b28387.glb",
+      "position_hint": "top-right",
+      "scale_3d": [1.5, 0.8, 1.2],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/industrial-grade_solar_panel_a_bd65d77a.glb",
       "description": "",
       "spatial_data": {
         "source": "Local Inference (GPU (CUDA))",
-        "raw_depth_Z": 41,
+        "raw_depth_Z": 36,
         "camera_metadata": {
           "is_fallback": true,
           "estimated_fov_degrees": 70
         },
-        "image_resolution": "750x505",
+        "image_resolution": "640x360",
         "target_coordinate": {
-          "u": 383,
-          "v": 186
+          "u": 531,
+          "v": 180
         },
         "spatial_3d_coordinates": {
-          "X_meter": 0.02,
-          "Y_meter": -0.15,
-          "Z_meter": 1.19
+          "X_meter": 0.62,
+          "Y_meter": 0,
+          "Z_meter": 1.35
         }
       },
       "vision_detection": {
-        "label": "top concrete roof slab",
-        "confidence": 0.34,
+        "label": "back right corner of the field",
+        "confidence": 0.6,
         "bounding_box": {
-          "xmax": 745,
-          "xmin": 21,
-          "ymax": 464,
-          "ymin": 131
+          "xmax": 638,
+          "xmin": 2,
+          "ymax": 358,
+          "ymin": 145
         },
         "center_coordinate": {
-          "u": 383,
-          "v": 186
+          "u": 531,
+          "v": 180
         }
       }
     },
     {
-      "name": "Modular recycled timber garden beds filled with dark fertile soil",
+      "name": "Vertical cylindrical rainwater harvesting tank, dark green color.",
       "asset_id": 3,
-      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/modular_recycled_timber_garden_40c24466.glb",
+      "position_hint": "center-right",
+      "scale_3d": [0.6, 1.2, 0.6],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/vertical_cylindrical_rainwater_cca392ba.glb",
       "description": "",
       "spatial_data": {
         "source": "Local Inference (GPU (CUDA))",
-        "raw_depth_Z": 89,
+        "raw_depth_Z": 6,
         "camera_metadata": {
           "is_fallback": true,
           "estimated_fov_degrees": 70
         },
-        "image_resolution": "750x505",
+        "image_resolution": "640x360",
         "target_coordinate": {
-          "u": 563,
-          "v": 480
+          "u": 154,
+          "v": 132
         },
         "spatial_3d_coordinates": {
-          "X_meter": 0.2,
-          "Y_meter": 0.24,
-          "Z_meter": 0.56
+          "X_meter": -2.59,
+          "Y_meter": -0.75,
+          "Z_meter": 7.14
         }
       },
       "vision_detection": {
-        "label": "lower ground level",
-        "confidence": 0.4,
+        "label": "right side of the greenhouse",
+        "confidence": 0.46,
         "bounding_box": {
-          "xmax": 675,
-          "xmin": 5,
-          "ymax": 496,
-          "ymin": 405
+          "xmax": 168,
+          "xmin": 90,
+          "ymax": 150,
+          "ymin": 116
         },
         "center_coordinate": {
-          "u": 563,
-          "v": 480
+          "u": 154,
+          "v": 132
+        }
+      }
+    },
+    {
+      "name": "A set of three small recycled plastic composting bins.",
+      "asset_id": 4,
+      "position_hint": "bottom-left",
+      "scale_3d": [0.4, 0.4, 0.8],
+      "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/a_set_of_three_small_recycled__36a6b3eb.glb",
+      "description": "",
+      "spatial_data": {
+        "source": "Local Inference (GPU (CUDA))",
+        "raw_depth_Z": 193,
+        "camera_metadata": {
+          "is_fallback": true,
+          "estimated_fov_degrees": 70
+        },
+        "image_resolution": "640x360",
+        "target_coordinate": {
+          "u": 107,
+          "v": 322
+        },
+        "spatial_3d_coordinates": {
+          "X_meter": -0.12,
+          "Y_meter": 0.08,
+          "Z_meter": 0.26
+        }
+      },
+      "vision_detection": {
+        "label": "bottom left corner of the field",
+        "confidence": 0.67,
+        "bounding_box": {
+          "xmax": 638,
+          "xmin": 2,
+          "ymax": 358,
+          "ymin": 145
+        },
+        "center_coordinate": {
+          "u": 107,
+          "v": 322
         }
       }
     }
   ],
   "status": "success",
   "project_context": {
-    "concept": "The Vertical Biophilic Hub",
+    "concept": "Regenerative Permaculture Field",
     "gemini_full_report": {
       "analysis": {
-        "reasoning": "Demolishing reinforced concrete is costly and carbon-intensive. The existing frame provides an ideal grid for a vertical food forest. By retaining the structure, we save on foundational costs and utilize the vertical space for high-density permaculture, using the slabs as platforms for nurseries and hydroponics.",
-        "land_size_est": "250 - 300 square meters",
-        "building_condition": "Abandoned two-story reinforced concrete skeleton. Exposed rebar on columns and slabs. Wooden formwork and scaffolding remnants are still attached. Structural integrity appears stable for retrofitting.",
+        "reasoning": "The land is currently idle and underutilized. Transforming it into a permaculture hub requires no demolition, only the addition of modular green structures and soil improvement, which minimizes carbon emissions and costs.",
+        "land_size_est": "5,000 - 8,000 square meters",
+        "building_condition": "The site is primarily unmanaged open land with scattered weeds and wild vegetation; background buildings are functional and should remain untouched.",
         "structural_decision": "Augment"
       },
       "green_solution": {
-        "description": "A multi-level permaculture facility. The ground floor serves as a community composting and heavy-crop zone. The second floor is dedicated to NFT hydroponics and vertical herb walls. The rooftop is utilized for solar harvesting and a rainwater catchment system to ensure self-sufficiency.",
-        "concept_name": "The Vertical Biophilic Hub",
-        "estimated_cost": 215000000,
-        "waste_management": "Abandoned wooden formwork will be treated and repurposed into raised garden beds. Exposed rebar will be cleaned and used as structural trellises for climbing plants (e.g., passion fruit or beans). Any loose concrete debris will be crushed to create a permeable drainage layer for the ground-floor garden."
+        "description": "A low-intervention transformation focusing on soil health, rainwater harvesting, and modular organic farming using recycled materials.",
+        "concept_name": "Regenerative Permaculture Field",
+        "estimated_cost": 85000000,
+        "waste_management": "Organic waste from clearing weeds will be processed via on-site pit composting to create nutrient-rich mulch for new planting beds."
       },
-      "image_gen_prompt": "A cinematic architectural visualization of an abandoned concrete building skeleton transformed into a lush vertical garden. Green vines and ivy climbing up the grey concrete pillars. Modern hydroponic pipes and wooden planters integrated into the open floors. Solar panels on the flat roof. People-free, focused on biodiversity. Bright natural lighting, photorealistic, permaculture style, 8k resolution.",
+      "image_gen_prompt": "Cinematic wide-angle landscape of a permaculture farm on a flat field. Features organized circular garden beds, a recycled glass greenhouse, solar panels, and a small rainwater pond. In the background are distant hills and existing white buildings. Photorealistic style, 8k resolution, sustainable architecture vibes.",
       "is_already_green": false,
       "rejection_reason": "",
       "components_for_3d": [
         {
           "id": 1,
           "scale_3d": [
-            10,
-            0.1,
-            10
+            8,
+            0.5,
+            8
           ],
-          "target_area": "dirt ground and weeds",
-          "to_generate": "Permaculture soil base with organized stone pathways and patches of clover grass",
-          "position_hint": "bottom-center"
+          "target_area": "dirt and weed covered ground",
+          "to_generate": "Flat permaculture soil base with painted 2D green grass and dirt texture. Completely flat geometry, no 3D grass geometry popping out.",
+          "position_hint": "center",
+          "scale_reasoning": "This is the mandatory foundation representing the entire project plot.",
+          "relative_position": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "id": 2,
           "scale_3d": [
-            6,
-            7,
-            6
+            2.5,
+            1.8,
+            2
           ],
-          "target_area": "grey concrete columns",
-          "to_generate": "Vertical climbing vine system with wooden trellises wrapping around the structure",
-          "position_hint": "center"
+          "target_area": "center of the field",
+          "to_generate": "Eco-friendly modular greenhouse made of recycled glass and bamboo frame.",
+          "position_hint": "center",
+          "scale_reasoning": "The greenhouse is the primary structure, serving as the largest focal point, roughly 10 times the size of a compost bin.",
+          "relative_position": [
+            0,
+            1.15,
+            0
+          ]
         },
         {
           "id": 3,
           "scale_3d": [
-            5,
             1.5,
-            5
+            0.8,
+            1.2
           ],
-          "target_area": "top concrete roof slab",
-          "to_generate": "Solar panel array with integrated rainwater collection tanks",
-          "position_hint": "top-center"
+          "target_area": "back right corner of the field",
+          "to_generate": "Industrial-grade solar panel array on a low-profile recycled aluminum rack.",
+          "position_hint": "top-right",
+          "scale_reasoning": "The solar array is medium-sized, designed to be shorter and smaller in footprint than the greenhouse.",
+          "relative_position": [
+            2.5,
+            0.65,
+            -2.5
+          ]
         },
         {
           "id": 4,
           "scale_3d": [
-            2.5,
             0.6,
-            1.5
+            1.2,
+            0.6
           ],
-          "target_area": "lower ground level",
-          "to_generate": "Modular recycled timber garden beds filled with dark fertile soil",
-          "position_hint": "bottom-right"
+          "target_area": "right side of the greenhouse",
+          "to_generate": "Vertical cylindrical rainwater harvesting tank, dark green color.",
+          "position_hint": "center-right",
+          "scale_reasoning": "The tank is tall but has a very small footprint, about 1/4th the width of the greenhouse.",
+          "relative_position": [
+            2,
+            0.85,
+            0
+          ]
+        },
+        {
+          "id": 5,
+          "scale_3d": [
+            0.4,
+            0.4,
+            0.8
+          ],
+          "target_area": "bottom left corner of the field",
+          "to_generate": "A set of three small recycled plastic composting bins.",
+          "position_hint": "bottom-left",
+          "scale_reasoning": "These are the smallest utility items, scaled down to 0.4 to reflect their minor physical presence compared to buildings.",
+          "relative_position": [
+            -3,
+            0.45,
+            3
+          ]
         }
       ]
     }
