@@ -123,7 +123,7 @@
     {
       "name": "Vertical cylindrical rainwater harvesting tank, dark green color.",
       "asset_id": 3,
-      "position_hint": "center-right",
+      "position_hint": "top-left",
       "scale_3d": [0.6, 1.2, 0.6],
       "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/vertical_cylindrical_rainwater_cca392ba.glb",
       "description": "",
@@ -163,7 +163,7 @@
     {
       "name": "A set of three small recycled plastic composting bins.",
       "asset_id": 4,
-      "position_hint": "bottom-left",
+      "position_hint": "bottom-center",
       "scale_3d": [0.4, 0.4, 0.8],
       "model_url": "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/a_set_of_three_small_recycled__36a6b3eb.glb",
       "description": "",
