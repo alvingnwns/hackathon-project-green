@@ -1,5 +1,6 @@
-import React, { useState, Suspense } from "react";
+import React, { useState, Suspense, useMemo } from "react";
 import axios from "axios";
+import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
 import mockData from "./mockData.json";
@@ -30,24 +31,78 @@ class ErrorBoundary extends React.Component {
 }
 
 // Komponen Sub untuk Me-render file GLB satuan
-function GLTFModel({ url, positionJSON }) {
+function GLTFModel({ url, positionJSON, index, scaleJSON, clusterCenter }) {
   // Pemuat GLTF (cached otomatis oleh Drei)
   const { scene } = useGLTF(url);
   
   // Ambil data X, Y, Z dari Backend (Depth Engine) dengan optional chaining
-  const x = positionJSON?.X_meter || 0;
-  const y = positionJSON?.Y_meter || 0;
-  const z = positionJSON?.Z_meter || -5; // Default agak ke depan kamera
+  // Tambahkan faktor pengali (multiplier) yang lebih besar agar jarak spasial lebih terpisah secara arsitektural (spread out)
+  const rawX = positionJSON?.X_meter || 0;
+  const rawZ = positionJSON?.Z_meter || 5;
 
-  // Pendekatan Arsitektural: Dibuat presisi dan seragam tanpa nilai acak 
-  // agar terlihat seperti maket perancangan kota / master plan yang profesional.
+  let finalX = rawX * 3.0; 
+  let finalZ = -rawZ * 2.5; 
+
+  // Cek apakah ini Base Ground (Lahan). Di JSON, id bisa 0 atau 1, tapi biasanya elemen paling pertama adalah alas.
+  const isBase = index === 0;
+
+  // Rotasi acak antara -10 hingga 10 derajat untuk objek selain base
+  // Dibungkus useState agar tidak dicomplain React Compiler (Math.random is impure during render)
+  const [randomRotationY] = useState(() => {
+    if (isBase) return 0;
+    const min = -10 * (Math.PI / 180);
+    const max = 10 * (Math.PI / 180);
+    return Math.random() * (max - min) + min;
+  });
+
+  // Fallback Grid Arsitektural: 
+  if (!isBase) {
+    // Buat formasi U-shape atau Grid Box
+    const col = (index - 1) % 3; 
+    const row = Math.floor((index - 1) / 3);
+    finalX = finalX + ((col - 1) * 2.5);
+    finalZ = finalZ - (row * 2.5);
+  }
+
+  // Skala dinamis
+  let scaleArr = Array.isArray(scaleJSON) ? scaleJSON : [1, 1, 1];
+  
+  if (isBase) {
+    if (clusterCenter) {
+      finalX = clusterCenter[0];
+      finalZ = clusterCenter[2];
+    }
+    // Pastikan alas (lahan) minimal melebar jauh untuk mencakup area. 
+    scaleArr = [
+      Math.max(scaleArr[0], 8.0), 
+      5, 
+      Math.max(scaleArr[2], 8.0)
+    ]; 
+  }
+
+  const [sx, sy, sz] = scaleArr;
+
+  // Pendekatan Matematika Fundamental: Mencari Bounding Box asli dari 3D Object
+  // Semua kalkulasi box & offset dilakukan tanpa mengubah dependency lokal secara reaktif
+  const { clonedScene, offsetY } = useMemo(() => {
+    const clone = scene.clone();
+    clone.scale.set(sx, sy, sz);
+    clone.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(clone);
+    const objectBottom = box.min.y;
+    const objectTop = box.max.y;
+    const GROUND_LEVEL = -2.0;
+    
+    const calculatedOffset = isBase ? (GROUND_LEVEL - objectTop) : (GROUND_LEVEL - objectBottom);
+    
+    return { clonedScene: clone, offsetY: calculatedOffset };
+  }, [scene, sx, sy, sz, isBase]);
+
   return (
-    <primitive 
-      object={scene.clone()} // Clone agar bisa dipakai berulang jika model sama
-      position={[x, y, z]} 
-      rotation={[0, 0, 0]} // Semua menghadap arah grid secara teratur
-      scale={[1, 1, 1]}    // Skala 1:1 sesuai metrik asli objeknya
-    />
+    <group position={[finalX, offsetY, finalZ]}>
+      <primitive object={clonedScene} rotation={[0, randomRotationY, 0]} />
+    </group>
   );
 }
 
@@ -78,7 +133,12 @@ function App() {
       setResultData(res.data);
     } catch (error) {
       console.error("Error processing landscape:", error);
-      alert("Terjadi kesalahan saat memproses gambar.");
+      if (error.response && error.response.status === 400 && error.response.data?.detail) {
+        // Tampilkan pesan alasan rejection dari backend (is_already_green)
+        alert("INFO: " + error.response.data.detail);
+      } else {
+        alert("Terjadi kesalahan sistem saat memproses gambar.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +147,54 @@ function App() {
   const handleUseMockData = () => {
     setResultData(mockData);
   };
+
+  const handleJSONUpload = (e) => {
+    const fileObj = e.target.files[0];
+    if (!fileObj) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsedJSON = JSON.parse(event.target.result);
+        if (parsedJSON.assets) {
+          setResultData(parsedJSON);
+        } else {
+          alert("Format JSON sepertinya tidak sesuai dengan struktur aplikasi.");
+        }
+      } catch (error) {
+        alert("Gagal membaca file JSON: Format tidak valid.");
+      }
+    };
+    reader.readAsText(fileObj);
+  };
+
+  // Kalkulasi target kamera yang akurat di tengah-tengah seluruh objek yang degenerate
+  const getCameraTarget = () => {
+    if (!resultData?.assets || resultData.assets.length === 0) return [0, -2, 0];
+    let sumX = 0;
+    let sumZ = 0;
+    let validCount = 0;
+
+    resultData.assets.forEach((asset, index) => {
+      const pos = asset.spatial_data?.spatial_3d_coordinates;
+      if (pos) {
+        const x = (pos.X_meter || 0) * 1.5; 
+        const finalX = Math.abs(x) < 0.1 ? (index % 3 - 1) * 2 : x;
+        const z = -(pos.Z_meter || 5) * 1.5 - ((Math.floor(index / 3)) * 1.5);
+        sumX += finalX;
+        sumZ += z;
+        validCount++;
+      }
+    });
+
+    if (validCount === 0) return [0, -2, 0];
+    // Offset orbit anchor sedikit ke belakang dan turun (karena anchor y=-2)
+    return [sumX / validCount, -2, sumZ / validCount];
+  };
+
+  const cameraTarget = getCameraTarget();
+  const baseAsset = resultData?.assets?.find(a => a.asset_id === 0);
+  const baseAnchorY = baseAsset?.spatial_data?.spatial_3d_coordinates?.Y_meter || 0;
 
   return (
     <div className="relative w-screen h-screen bg-neutral-900 text-white overflow-hidden">
@@ -100,29 +208,29 @@ function App() {
             className="absolute inset-0 w-full h-full object-cover opacity-30" 
           />
         )}
-        <Canvas camera={{ position: [0, 5, 10], fov: 60 }}>
+        
+        <Canvas camera={{ position: [cameraTarget[0], cameraTarget[1] + 8, cameraTarget[2] + 15], fov: 60 }}>
           <ambientLight intensity={1.5} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <Environment preset="city" />
-          <OrbitControls makeDefault />
+          <OrbitControls makeDefault target={cameraTarget} />
 
           {/* Render Komponen 3D Asli dari JSON */}
           <Suspense fallback={null}>
             {resultData && resultData.assets?.map((asset, index) => {
-              if (!asset.model_url) return null; // Lewati jika gagal generate
-              
-              // Jika ini URL Meshy (yang kena CORS), proxy lewat backend. 
-              // Jika sudah berada di Supabase (tidak kena CORS), bisa dirender langsung!
-              const isMeshy = asset.model_url.includes("meshy.ai");
-              const safeUrl = isMeshy 
-                ? `http://localhost:8000/api/v1/proxy-glb?url=${encodeURIComponent(asset.model_url)}` 
-                : asset.model_url;
+              if (!asset.model_url) return null;
               
               return (
                 <ErrorBoundary key={index}>
                   <GLTFModel 
-                    url={safeUrl} 
+                    url={asset.model_url} 
+                    // Ambil koordinat 'relative_position' yang dibuat Gemini
                     positionJSON={asset.spatial_data?.spatial_3d_coordinates} 
+                    index={index}
+                    // Ambil 'scale_3d' yang sudah dipikirkan rasionya oleh Gemini
+                    scaleJSON={asset.scale_3d}
+                    clusterCenter={cameraTarget}
+                    baseAnchorY={baseAnchorY}
                   />
                 </ErrorBoundary>
               );
@@ -159,10 +267,20 @@ function App() {
           
           <button 
             onClick={handleUseMockData}
-            className="w-full py-2 rounded-lg font-bold text-emerald-300 border border-emerald-500 hover:bg-emerald-900/50 transition-all shadow-lg"
+            className="w-full py-2 mb-2 rounded-lg font-bold text-emerald-300 border border-emerald-500 hover:bg-emerald-900/50 transition-all shadow-lg"
           >
             Gunakan Data JSON Lokal (Hemat API)
           </button>
+
+          <label className="w-full py-2 rounded-lg font-bold text-neutral-300 border border-neutral-500 hover:bg-neutral-700/50 transition-all shadow-lg cursor-pointer flex justify-center items-center text-center">
+            📄 Upload History JSON
+            <input 
+              type="file" 
+              accept=".json" 
+              onChange={handleJSONUpload}
+              className="hidden"
+            />
+          </label>
         </div>
 
         {/* Results Info Overlay */}

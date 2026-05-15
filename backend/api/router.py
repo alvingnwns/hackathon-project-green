@@ -10,32 +10,11 @@ from services.ai_analyzer import analyze_landscape
 from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
 from services.meshy_engine import generate_multiple_models
-from services.supabase_engine import upload_meshy_to_supabase
+from services.supabase_engine import upload_meshy_to_supabase, save_project_to_db
 import numpy as np
-import httpx
-from fastapi.responses import StreamingResponse
 
 register_heif_opener()
 router = APIRouter()
-
-@router.get("/proxy-glb")
-async def proxy_glb(url: str):
-    """
-    Endpoint proxy untuk mengatasi masalah CORS AWS saat frontend mencoba 
-    memuat file .glb langsung dari URL meshy.ai.
-    """
-    if not url.startswith("http"):
-        raise HTTPException(status_code=400, detail="Invalid URL")
-        
-    async def fetch_file():
-        async with httpx.AsyncClient() as client:
-            async with client.stream("GET", url) as response:
-                if response.status_code != 200:
-                    raise HTTPException(status_code=response.status_code, detail="Gagal mengunduh GLB")
-                async for chunk in response.aiter_bytes():
-                    yield chunk
-
-    return StreamingResponse(fetch_file(), media_type="model/gltf-binary")
 
 @router.post("/process-landscape")
 async def process_landscape(file: UploadFile = File(...)):
@@ -53,6 +32,13 @@ async def process_landscape(file: UploadFile = File(...)):
         analysis_json_str = analyze_landscape(img)
         analysis_result = json.loads(analysis_json_str)
         
+        # Validasi Ekosistem Hijau
+        if analysis_result.get("is_already_green"):
+            reason = analysis_result.get("rejection_reason", "Gambar sudah berupa ekosistem hijau yang rapi. Tidak perlu memproses 3D.")
+            # Mengembalikan response tanpa perlu raise HTTPException (agar bisa dirender rapi di UI)
+            # 400 Bad Request juga bisa, tapi lebih halus via 400
+            raise HTTPException(status_code=400, detail=reason)
+            
         # Ekstrak komponen dari saran Gemini
         components = analysis_result.get("components_for_3d", [])
         
@@ -98,7 +84,8 @@ async def process_landscape(file: UploadFile = File(...)):
                 "name": prompt_3d,
                 "description": item.get("description", ""),
                 "visual_data": vision_data,
-                "spatial_data": spatial_data
+                "spatial_data": spatial_data,
+                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]) # Fallback scale default
             })
             prompts_to_generate.append(prompt_3d)
 
@@ -133,7 +120,7 @@ async def process_landscape(file: UploadFile = File(...)):
             })
 
         # --- SEMUA HASIL ---
-        return {
+        response_payload = {
             "status": "success",
             "project_context": {
                 "concept": analysis_result.get("green_solution", {}).get("concept_name", "Eco Design"),
@@ -141,6 +128,11 @@ async def process_landscape(file: UploadFile = File(...)):
             },
             "assets": final_assets
         }
+
+        # Simpan History JSON ke Supabase PostgreSQL
+        save_project_to_db(response_payload)
+
+        return response_payload
 
     except Exception as e:
         print(f"❌ Error di Router: {e}")
