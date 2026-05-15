@@ -33,7 +33,7 @@ class ErrorBoundary extends React.Component {
 // === Sistem Posisi Grid 3x3 ===
 // Dikalkulasi dari rumus: 3 baris × 3 kolom dengan jarak GRID_SPACING meter.
 // Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari nama posisi.
-const GRID_SPACING = 2.5;
+const GRID_SPACING = 3.0;
 const GRID_POSITIONS = Object.fromEntries(
   ["top", "center", "bottom"].flatMap((row, ri) =>
     ["left", "center", "right"].map((col, ci) => {
@@ -84,9 +84,10 @@ function GLTFModel({ url, index, scaleJSON, positionHint, clusterCenter }) {
 
   const [sx, sy, sz] = scaleArr;
 
-  // Pendekatan Matematika Fundamental: Mencari Bounding Box asli dari 3D Object
-  // Semua kalkulasi box & offset dilakukan tanpa mengubah dependency lokal secara reaktif
-  const { clonedScene, offsetY } = useMemo(() => {
+  // Pendekatan Matematika Fundamental: Mencari Bounding Box asli dari 3D Object.
+  // Untuk base: hitung juga center XZ agar model selalu terpusat di world origin,
+  // tidak bergantung pada letak origin internal model GLB (yang sering tidak di tengah).
+  const { clonedScene, offsetY, xzOffset } = useMemo(() => {
     const clone = scene.clone();
     clone.scale.set(sx, sy, sz);
     clone.updateMatrixWorld(true);
@@ -97,12 +98,17 @@ function GLTFModel({ url, index, scaleJSON, positionHint, clusterCenter }) {
     const GROUND_LEVEL = -2.0;
     
     const calculatedOffset = isBase ? (GROUND_LEVEL - objectTop) : (GROUND_LEVEL - objectBottom);
+
+    // Hitung geser XZ agar model base selalu berpusat di (0, _, 0)
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    const xzOffset = isBase ? [-cx, -cz] : [0, 0];
     
-    return { clonedScene: clone, offsetY: calculatedOffset };
+    return { clonedScene: clone, offsetY: calculatedOffset, xzOffset };
   }, [scene, sx, sy, sz, isBase]);
 
   return (
-    <group position={[finalX, offsetY, finalZ]}>
+    <group position={[finalX + xzOffset[0], offsetY, finalZ + xzOffset[1]]}>
       <primitive object={clonedScene} rotation={[0, randomRotationY, 0]} />
     </group>
   );
