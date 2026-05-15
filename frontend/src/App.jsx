@@ -111,10 +111,17 @@ function App() {
             {resultData && resultData.assets?.map((asset, index) => {
               if (!asset.model_url) return null; // Lewati jika gagal generate
               
+              // Jika ini URL Meshy (yang kena CORS), proxy lewat backend. 
+              // Jika sudah berada di Supabase (tidak kena CORS), bisa dirender langsung!
+              const isMeshy = asset.model_url.includes("meshy.ai");
+              const safeUrl = isMeshy 
+                ? `http://localhost:8000/api/v1/proxy-glb?url=${encodeURIComponent(asset.model_url)}` 
+                : asset.model_url;
+              
               return (
                 <ErrorBoundary key={index}>
                   <GLTFModel 
-                    url={asset.model_url} 
+                    url={safeUrl} 
                     positionJSON={asset.spatial_data?.spatial_3d_coordinates} 
                   />
                 </ErrorBoundary>

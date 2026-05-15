@@ -10,10 +10,32 @@ from services.ai_analyzer import analyze_landscape
 from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
 from services.meshy_engine import generate_multiple_models
+from services.supabase_engine import upload_meshy_to_supabase
 import numpy as np
+import httpx
+from fastapi.responses import StreamingResponse
 
 register_heif_opener()
 router = APIRouter()
+
+@router.get("/proxy-glb")
+async def proxy_glb(url: str):
+    """
+    Endpoint proxy untuk mengatasi masalah CORS AWS saat frontend mencoba 
+    memuat file .glb langsung dari URL meshy.ai.
+    """
+    if not url.startswith("http"):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+        
+    async def fetch_file():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", url) as response:
+                if response.status_code != 200:
+                    raise HTTPException(status_code=response.status_code, detail="Gagal mengunduh GLB")
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+
+    return StreamingResponse(fetch_file(), media_type="model/gltf-binary")
 
 @router.post("/process-landscape")
 async def process_landscape(file: UploadFile = File(...)):
@@ -92,14 +114,20 @@ async def process_landscape(file: UploadFile = File(...)):
             if isinstance(res, Exception):
                 print(f"❌ Error rendering {comp['name']}: {res}")
                 model_url = None
+                final_url = None
             else:
                 model_url = res.get("model_url")
+                # Jika kita dapat model_url dari Meshy, segera upload ke Supabase
+                if model_url:
+                    final_url = await upload_meshy_to_supabase(comp["name"], model_url)
+                else:
+                    final_url = None
                 
             final_assets.append({
                 "asset_id": comp["id"],
                 "name": comp["name"],
                 "description": comp["description"],
-                "model_url": model_url,
+                "model_url": final_url, # Gunakan URL Supabase di database / JSON balasan
                 "spatial_data": comp["spatial_data"],
                 "vision_detection": comp["visual_data"]
             })
