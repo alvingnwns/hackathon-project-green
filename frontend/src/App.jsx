@@ -137,7 +137,7 @@ function App() {
 
     try {
       // Endpoint ke FastAPI Backend
-      const res = await axios.post("http://localhost:8000/api/v1/process-landscape", formData);
+      const res = await axios.post("http://127.0.0.1:8000/api/v1/process-landscape", formData);
       setResultData(res.data);
     } catch (error) {
       console.error("Error processing landscape:", error);

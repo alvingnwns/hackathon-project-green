@@ -19,8 +19,8 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
     formData.append('file', file);
 
     const url = dryRun
-      ? 'http://localhost:8000/api/v1/process-landscape?dry_run=true'
-      : 'http://localhost:8000/api/v1/process-landscape';
+      ? 'http://127.0.0.1:8000/api/v1/process-landscape?dry_run=true'
+      : 'http://127.0.0.1:8000/api/v1/process-landscape';
 
     try {
       const response = await fetch(url, {
