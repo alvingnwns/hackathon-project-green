@@ -22,6 +22,8 @@ STOCK_MODELS = [
     f"{SUPABASE_PUBLIC}/integrated_vertical_greenhouse_fc0b529a.glb",
     f"{SUPABASE_PUBLIC}/industrial_solar_panel_array_o_8eb8e6cd.glb",
     f"{SUPABASE_PUBLIC}/set_of_three_color-coded_recyc_4debc1f8.glb",
+    f"{SUPABASE_PUBLIC}/triple-compartment_recycled_pl_196d2497.glb",
+    f"{SUPABASE_PUBLIC}/industrial_recycled_steel_gree_bccd392d.glb"
 ]
 
 @router.post("/process-landscape")
