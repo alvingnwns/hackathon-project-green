@@ -12,3 +12,11 @@ frontend/dist/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Documentation / Design notes (ignore entire md/ folder)
+md/
+
+# Design diagrams & screenshots (development artifacts)
+image.png
+test.json
+newFlow.excalidraw
