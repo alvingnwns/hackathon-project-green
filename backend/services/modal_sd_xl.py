@@ -10,7 +10,7 @@ Architecture:
 
 import io
 import modal
-from modal import App, Image, Volume
+from modal import App, Image
 
 # --- Modal App Definition ---
 app = modal.App("greenscape-sd-xl")
@@ -110,6 +110,11 @@ class SDXLGenerator:
         return buf.getvalue()
 
 
+    @modal.method()
+    def warm(self) -> str:
+        """Lightweight method to keep the container alive without generating."""
+        return "SD-XL container is warm"
+
 # --- Keep warm schedule to prevent cold starts ---
 @app.function(
     image=sd_image,
@@ -118,7 +123,7 @@ class SDXLGenerator:
 def keep_warm():
     """Keep the SD-XL container warm to minimize cold start latency."""
     generator = SDXLGenerator()
-    generator.load_model.remote()
+    generator.warm.remote()
     print("⏰ Keep-warm ping sent to SD-XL container")
 
 

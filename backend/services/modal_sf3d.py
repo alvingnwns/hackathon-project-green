@@ -11,7 +11,6 @@ Architecture:
 
 import io
 import os
-import tempfile
 import modal
 from modal import App, Image as ModalImage
 
@@ -138,6 +137,11 @@ class SF3DGenerator:
         return glb_buf.getvalue()
 
 
+    @modal.method()
+    def warm(self) -> str:
+        """Lightweight method to keep the container alive without generating."""
+        return "SF3D container is warm"
+
 # --- Keep warm schedule ---
 @app.function(
     image=sf3d_image,
@@ -146,7 +150,7 @@ class SF3DGenerator:
 def keep_warm():
     """Keep the SF3D container warm."""
     generator = SF3DGenerator()
-    generator.load_model.remote()
+    generator.warm.remote()
     print("⏰ Keep-warm ping sent to SF3D container")
 
 
