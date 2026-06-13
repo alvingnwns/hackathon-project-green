@@ -15,6 +15,7 @@ export default function WorkshopPage() {
 
   const [localData, setLocalData] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [progressText, setProgressText] = useState<string>('');
 
   const isBlankState = projectId === 'blank' && !localData;
   const isErrorState = !isBlankState && !loading && error && !localData;
@@ -52,6 +53,9 @@ export default function WorkshopPage() {
             <div className='text-center space-y-4'>
               <LoadingSpinner />
               <p className='text-sm text-neutral-400'>Processing image with AI...</p>
+              {progressText && (
+                <p className='text-xs text-neutral-500 max-w-xs mx-auto'>{progressText}</p>
+              )}
             </div>
           </div>
         )}
@@ -82,6 +86,7 @@ export default function WorkshopPage() {
             onDataLoaded={setLocalData}
             isLoading={isUploading}
             setIsLoading={setIsUploading}
+            onProgressUpdate={setProgressText}
           />
         </div>
 
