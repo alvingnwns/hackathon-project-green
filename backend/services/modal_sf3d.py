@@ -60,13 +60,13 @@ class SF3DGenerator:
     @modal.enter()
     def load_model(self):
         """Load the Stable Fast 3D model into GPU memory."""
-        import torch
+        import torch  # type: ignore
         
         print("🚀 Loading Stable Fast 3D model onto GPU...")
         self.device = torch.device("cuda")
         
         # Import sf3d inside the container
-        from sf3d.system import SF3D
+        from sf3d.system import SF3D  # type: ignore
         from huggingface_hub import hf_hub_download
         
         model_path = hf_hub_download(
@@ -94,10 +94,10 @@ class SF3DGenerator:
         Returns:
             .glb file as bytes.
         """
-        import torch
-        import numpy as np
-        from PIL import Image as PILImage
-        import trimesh
+        import torch  # type: ignore
+        import numpy as np  # type: ignore
+        from PIL import Image as PILImage  # type: ignore
+        import trimesh  # type: ignore
 
         # Load image from bytes
         pil_image = PILImage.open(io.BytesIO(image_bytes)).convert("RGB")

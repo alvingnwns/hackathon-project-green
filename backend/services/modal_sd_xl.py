@@ -52,8 +52,8 @@ class SDXLGenerator:
     @modal.enter()
     def load_model(self):
         """Load SD-XL model into GPU memory (called once per container)."""
-        import torch
-        from diffusers import StableDiffusionXLPipeline
+        import torch  # type: ignore
+        from diffusers import StableDiffusionXLPipeline  # type: ignore
 
         print("🚀 Loading SD-XL 1.0 base model onto GPU...")
         self.pipe = StableDiffusionXLPipeline.from_pretrained(
@@ -79,8 +79,8 @@ class SDXLGenerator:
         Returns:
             PNG image as bytes with clean background suitable for SF3D.
         """
-        import torch
-        from PIL import Image as PILImage
+        import torch  # type: ignore
+        from PIL import Image as PILImage  # type: ignore
 
         if negative_prompt == "":
             negative_prompt = (
