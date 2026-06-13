@@ -1,127 +1,426 @@
+"""
+Main Router — GreenScape AI 2D-to-3D Pipeline.
+
+Endpoints:
+  POST /api/v1/process-landscape — Upload image, trigger async pipeline
+  GET  /api/v1/tasks/{task_id}  — Poll task status & get results
+
+Pipeline Flow (NEW):
+  1. Validate & upload raw image to Supabase Storage
+  2. Gemini analysis → components_for_3d[] with sd_xl_prompt
+  3. Split routing: metadata → DB, raw image → Storage
+  4. For each component: Vision (Grounding DINO) → Depth (Depth-Anything-V2) → Spatial Math
+  5. Parallel Modal pipeline: SD-XL → SF3D for all non-base components
+  6. Assembly: combine vision + depth + modal results into final JSON
+  7. Save to Supabase DB, return result
+
+Legacy dry_run mode preserved for testing without Modal credits.
+"""
+
 import io
 import json
+import uuid
+import asyncio
+from typing import Optional
+from datetime import datetime
+
 from fastapi import APIRouter, File, UploadFile, HTTPException, Query
+from fastapi.responses import JSONResponse
 from PIL import Image
 from pillow_heif import register_heif_opener
-from core.config import settings
 
-# Import semua engine kita
+from core.config import settings
 from services.ai_analyzer import analyze_landscape
 from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
-from services.meshy_engine import generate_multiple_models
-from services.supabase_engine import upload_meshy_to_supabase, save_project_to_db
+from services.modal_engine import modal_engine, ModalPipelineError
+from services.supabase_engine import (
+    upload_raw_image,
+    upload_glb_bytes,
+    save_project_to_db,
+    get_project_by_id,
+)
+
 import numpy as np
 
 register_heif_opener()
 router = APIRouter()
 
-# Stock GLB pool used for dry_run mode (no Meshy credits consumed)
+# ──────────────────────────────────────────────
+# In-Memory Task Store (for async pipeline)
+# ──────────────────────────────────────────────
+# In production, replace with Redis or DB-backed queue.
+# Key: task_id (str), Value: task state dict
+_task_store: dict = {}
+
+# Stock GLB pool used for dry_run mode
 SUPABASE_PUBLIC = "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models"
 STOCK_MODELS = [
     f"{SUPABASE_PUBLIC}/integrated_vertical_greenhouse_fc0b529a.glb",
     f"{SUPABASE_PUBLIC}/industrial_solar_panel_array_o_8eb8e6cd.glb",
     f"{SUPABASE_PUBLIC}/set_of_three_color-coded_recyc_4debc1f8.glb",
 ]
+BASE_LAND_URL = f"{SUPABASE_PUBLIC}/flat_permaculture_soil_base_wi_c5e93b92.glb"
 
-@router.post("/process-landscape")
-async def process_landscape(file: UploadFile = File(...), dry_run: bool = Query(False, description="Skip Meshy API — use stock GLBs instead")):
-    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Format file tidak didukung.")
 
+# ──────────────────────────────────────────────
+# Helper: Build final asset list from processed components
+# ──────────────────────────────────────────────
+def _build_final_assets(
+    processed_components: list,
+    modal_results: list,
+    dry_run: bool = False,
+) -> list:
+    """
+    Merge vision/depth/spatial data with Modal-generated .glb URLs.
+    modal_results is a parallel list matching non-base components.
+    """
+    final_assets = []
+    modal_idx = 0  # index into modal_results (only for non-base)
+
+    for comp in processed_components:
+        is_base = comp.get("original_id") == 1 or comp.get("id") == 0
+
+        if is_base:
+            model_url = BASE_LAND_URL
+        else:
+            if modal_idx < len(modal_results):
+                res = modal_results[modal_idx]
+                if res.get("error"):
+                    print(f"⚠️ Modal failed for {comp['name']}: {res['error']}")
+                    model_url = None
+                else:
+                    model_url = res.get("model_url")  # already uploaded to Supabase
+                modal_idx += 1
+            else:
+                model_url = None
+
+        final_assets.append({
+            "asset_id": comp["id"],
+            "name": comp["name"],
+            "description": comp.get("description", ""),
+            "model_url": model_url,
+            "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),
+            "position_hint": comp.get("position_hint", "center"),
+            "spatial_data": comp.get("spatial_data", {}),
+            "vision_detection": comp.get("visual_data", {}),
+        })
+
+    return final_assets
+
+
+# ──────────────────────────────────────────────
+# Main pipeline function (runs in background)
+# ──────────────────────────────────────────────
+async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
+    """
+    Execute the full 2D-to-3D pipeline asynchronously.
+    Updates _task_store[task_id] with progress and final result.
+    """
     try:
-        # 1. Persiapan Gambar
-        img_bytes = await file.read()
+        _task_store[task_id]["status"] = "processing"
+        _task_store[task_id]["progress"] = "Parsing image and running Gemini analysis..."
+
+        # 1. Open image
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         width, height = img.size
 
-        # --- NODE 1: Analisis Gemini ---
-        print("➡️ Menjalankan Node 1: Gemini Analysis...")
+        # 2. Upload raw image to Supabase (fire-and-forget)
+        raw_image_url = await upload_raw_image(img_bytes, "upload")
+        _task_store[task_id]["raw_image_url"] = raw_image_url
+
+        # 3. Gemini Analysis
+        _task_store[task_id]["progress"] = "Running Gemini landscape analysis..."
         analysis_json_str = analyze_landscape(img)
         analysis_result = json.loads(analysis_json_str)
-        
-        # Validasi Ekosistem Hijau
+
+        # Gatekeeper check
         if analysis_result.get("is_already_green"):
-            reason = analysis_result.get("rejection_reason", "Gambar sudah berupa ekosistem hijau yang rapi. Tidak perlu memproses 3D.")
-            # Mengembalikan response tanpa perlu raise HTTPException (agar bisa dirender rapi di UI)
-            # 400 Bad Request juga bisa, tapi lebih halus via 400
-            raise HTTPException(status_code=400, detail=reason)
-            
-        # Ekstrak komponen dari saran Gemini
+            _task_store[task_id]["status"] = "completed"
+            _task_store[task_id]["result"] = {
+                "is_already_green": True,
+                "rejection_reason": analysis_result.get(
+                    "rejection_reason",
+                    "Gambar sudah berupa ekosistem hijau yang rapi."
+                )
+            }
+            _task_store[task_id]["progress"] = "Image is already green — rejected."
+            return
+
         components = analysis_result.get("components_for_3d", [])
-        
-        # Proses pipeline paralel untuk Multi-Object
-        processed_components = []
-        prompts_to_generate = []
-        prompts_to_pc_index = []  # mapping from prompt index -> processed_components index
-
-        # Optional: reuse a static base land model from Supabase to save Meshy credits
-        BASE_LAND_URL = "https://tnfulriepkzquoafqidv.supabase.co/storage/v1/object/public/glb_models/flat_permaculture_soil_base_wi_c5e93b92.glb"
-
         if not components:
-            # Fallback jika kosong
-            components = [{"to_generate": "bamboo pavilion", "target_area": "ground", "description": "Fallback asset"}]
+            components = [{
+                "to_generate": "bamboo pavilion",
+                "sd_xl_prompt": "A bamboo pavilion on clean white background, isometric view",
+                "target_area": "ground",
+                "description": "Fallback asset"
+            }]
+
+        # 4. Process each component: Vision → Depth → Spatial
+        _task_store[task_id]["progress"] = f"Running Vision + Depth engines on {len(components)} components..."
+        processed_components = []
+        prompts_for_modal = []  # list of {sd_xl_prompt, name}
 
         for idx, item in enumerate(components):
             prompt_3d = item.get("to_generate", "building")
+            sd_xl_prompt = item.get("sd_xl_prompt", prompt_3d)
             raw_target = item.get("target_area", "ground")
             position_hint = item.get("position_hint", "middle")
-            
-            # Pengaman bahasa
+            original_item_id = item.get("id")
+
             target_label = "ground" if "LAHAN KOSONG" in raw_target.upper() else raw_target
 
-            # --- NODE 2 & 3: Vision Engine (Mencari Objek O C) ---
-            print(f"➡️ Menjalankan Node 2: Mencari area '{target_label}' untuk objek '{prompt_3d}'...")
+            # Vision Engine
             vision_data = find_target_object(img, target_label, position_hint)
-
             if not vision_data:
                 vision_data = {
                     "label": target_label,
                     "confidence": 0.0,
                     "bounding_box": None,
                     "center_coordinate": {"u": width // 2, "v": height // 2},
-                    "warning": "Objek tidak terdeteksi, menggunakan titik tengah fallback."
+                    "warning": "Object not detected, using image center fallback."
                 }
 
-            # --- NODE 5 & 6: Depth & Spatial Engine ---
-            print(f"➡️ Menjalankan Node 5 & 6: Spatial Mapping untuk '{prompt_3d}'...")
+            # Depth Engine
             target_u = vision_data["center_coordinate"]["u"]
             target_v = vision_data["center_coordinate"]["v"]
-            
             spatial_data = extract_depth_at_pixel(img, target_u, target_v)
 
-            # record original item id from Gemini (if present) to detect base
-            original_item_id = item.get("id")
-            pc_index = len(processed_components)
-            processed_components.append({
+            pc_entry = {
                 "id": idx,
                 "original_id": original_item_id,
                 "name": prompt_3d,
                 "description": item.get("description", ""),
                 "visual_data": vision_data,
                 "spatial_data": spatial_data,
-                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]), # Fallback scale default
-                "position_hint": item.get("position_hint", "center") # Hint posisi grid dari Gemini
+                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]),
+                "position_hint": item.get("position_hint", "center"),
+            }
+            processed_components.append(pc_entry)
+
+            # Queue for Modal (skip base/land)
+            if original_item_id != 1 and idx != 0:
+                prompts_for_modal.append({
+                    "sd_xl_prompt": sd_xl_prompt,
+                    "name": prompt_3d,
+                })
+
+        # 5. Run Modal pipeline for non-base components
+        final_modal_results = []
+        if prompts_for_modal:
+            _task_store[task_id]["progress"] = (
+                f"Running Modal.com SD-XL → SF3D for {len(prompts_for_modal)} components..."
+            )
+
+            if dry_run:
+                # Dry run: use stock GLBs, skip Modal
+                for i in range(len(prompts_for_modal)):
+                    final_modal_results.append({
+                        "name": prompts_for_modal[i]["name"],
+                        "model_url": STOCK_MODELS[i % len(STOCK_MODELS)],
+                        "error": None,
+                    })
+            else:
+                # Real Modal pipeline
+                modal_raw_results = await modal_engine.generate_multiple_3d(prompts_for_modal)
+
+                # Upload each GLB to Supabase
+                for res in modal_raw_results:
+                    if res["glb_bytes"] and not res["error"]:
+                        glb_url = await upload_glb_bytes(res["name"], res["glb_bytes"])
+                        final_modal_results.append({
+                            "name": res["name"],
+                            "model_url": glb_url,
+                            "error": None,
+                        })
+                    else:
+                        final_modal_results.append({
+                            "name": res["name"],
+                            "model_url": None,
+                            "error": res.get("error", "Unknown Modal error"),
+                        })
+
+        # 6. Assemble final output
+        _task_store[task_id]["progress"] = "Assembling final output..."
+        final_assets = _build_final_assets(processed_components, final_modal_results, dry_run)
+
+        response_payload = {
+            "status": "success",
+            "project_context": {
+                "concept": analysis_result.get("green_solution", {}).get("concept_name", "Eco Design"),
+                "gemini_full_report": analysis_result,
+            },
+            "assets": final_assets,
+        }
+
+        # 7. Save to DB
+        save_project_to_db(response_payload)
+
+        # 8. Finalize task
+        _task_store[task_id]["status"] = "completed"
+        _task_store[task_id]["result"] = response_payload
+        _task_store[task_id]["progress"] = "Pipeline completed successfully."
+
+    except Exception as e:
+        print(f"❌ Pipeline error for task {task_id}: {e}")
+        _task_store[task_id]["status"] = "failed"
+        _task_store[task_id]["error"] = str(e)
+        _task_store[task_id]["progress"] = f"Pipeline failed: {e}"
+
+
+# ──────────────────────────────────────────────
+# POST /api/v1/process-landscape
+# ──────────────────────────────────────────────
+@router.post("/process-landscape")
+async def process_landscape(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="Skip Modal API — use stock GLBs instead"),
+):
+    """Upload image and start async 2D-to-3D pipeline. Returns a task_id for polling."""
+    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Format file tidak didukung.")
+
+    try:
+        img_bytes = await file.read()
+
+        # Create async task
+        task_id = str(uuid.uuid4())
+        _task_store[task_id] = {
+            "status": "queued",
+            "progress": "Task queued, waiting to start...",
+            "created_at": datetime.utcnow().isoformat(),
+            "dry_run": dry_run,
+            "result": None,
+            "error": None,
+            "raw_image_url": None,
+        }
+
+        # Launch pipeline in background
+        asyncio.create_task(_run_pipeline(task_id, img_bytes, dry_run))
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "task_id": task_id,
+                "status": "queued",
+                "message": "Pipeline started. Poll GET /api/v1/tasks/{task_id} for results.",
+            }
+        )
+
+    except Exception as e:
+        print(f"❌ Error submitting task: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+# GET /api/v1/tasks/{task_id}
+# ──────────────────────────────────────────────
+@router.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """Poll task status. Returns current progress and final result when completed."""
+    task = _task_store.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
+
+    response = {
+        "task_id": task_id,
+        "status": task["status"],
+        "progress": task["progress"],
+        "created_at": task["created_at"],
+    }
+
+    if task["status"] == "completed" and task["result"]:
+        response["result"] = task["result"]
+    elif task["status"] == "failed":
+        response["error"] = task["error"]
+
+    return response
+
+
+# ──────────────────────────────────────────────
+# GET /api/v1/projects/{project_id}
+# ──────────────────────────────────────────────
+@router.get("/projects/{project_id}")
+async def get_project(project_id: str):
+    """Fetch a saved project from Supabase by its UUID."""
+    project = get_project_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return project
+
+
+# ──────────────────────────────────────────────
+# [LEGACY] GET /api/v1/process-landscape-sync
+# Kept for backward compatibility
+# ──────────────────────────────────────────────
+@router.post("/process-landscape-sync")
+async def process_landscape_sync(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="Skip Meshy API — use stock GLBs instead"),
+):
+    """
+    [LEGACY] Original synchronous pipeline using Meshy.
+    Kept for backward compatibility. New code should use /process-landscape (async).
+    """
+    from services.meshy_engine import generate_multiple_models
+
+    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Format file tidak didukung.")
+
+    try:
+        img_bytes = await file.read()
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        width, height = img.size
+
+        print("➡️ [LEGACY] Running Gemini Analysis...")
+        analysis_json_str = analyze_landscape(img)
+        analysis_result = json.loads(analysis_json_str)
+
+        if analysis_result.get("is_already_green"):
+            reason = analysis_result.get("rejection_reason", "Image already green.")
+            raise HTTPException(status_code=400, detail=reason)
+
+        components = analysis_result.get("components_for_3d", [])
+        processed_components = []
+        prompts_to_generate = []
+
+        for idx, item in enumerate(components):
+            prompt_3d = item.get("to_generate", "building")
+            raw_target = item.get("target_area", "ground")
+            position_hint = item.get("position_hint", "middle")
+            original_item_id = item.get("id")
+
+            target_label = "ground" if "LAHAN KOSONG" in raw_target.upper() else raw_target
+
+            vision_data = find_target_object(img, target_label, position_hint)
+            if not vision_data:
+                vision_data = {
+                    "label": target_label, "confidence": 0.0, "bounding_box": None,
+                    "center_coordinate": {"u": width // 2, "v": height // 2},
+                    "warning": "Fallback to center."
+                }
+
+            target_u = vision_data["center_coordinate"]["u"]
+            target_v = vision_data["center_coordinate"]["v"]
+            spatial_data = extract_depth_at_pixel(img, target_u, target_v)
+
+            pc_index = len(processed_components)
+            processed_components.append({
+                "id": idx, "original_id": original_item_id,
+                "name": prompt_3d, "description": item.get("description", ""),
+                "visual_data": vision_data, "spatial_data": spatial_data,
+                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]),
+                "position_hint": item.get("position_hint", "center"),
             })
 
-            # If this component is the base/land (Gemini id == 1 or first item), DO NOT request Meshy.
-            # We'll reuse the pre-uploaded Supabase GLB to save credits.
             if original_item_id == 1 or idx == 0:
-                # skip adding to prompts_to_generate
                 continue
-
-            # otherwise queue for Meshy generation and map prompt->processed_components index
             prompts_to_generate.append(prompt_3d)
-            prompts_to_pc_index.append(pc_index)
 
-        # --- NODE 4: Generating 3D Models in Parallel ---
-        print(f"➡️ Menjalankan Node 4: Generating {len(prompts_to_generate)} 3D Models secara PARALEL...")
-        # Call Meshy only for non-base items
+        print(f"➡️ [LEGACY] Generating {len(prompts_to_generate)} 3D models via Meshy...")
         meshy_results = []
         if prompts_to_generate:
             if dry_run:
-                # Dry run: skip Meshy, cycle through stock GLBs
-                print("🧪 [DRY RUN] Melewati Meshy API — menggunakan stock GLBs.")
                 meshy_results = [
                     {"model_url": STOCK_MODELS[i % len(STOCK_MODELS)]}
                     for i in range(len(prompts_to_generate))
@@ -129,57 +428,48 @@ async def process_landscape(file: UploadFile = File(...), dry_run: bool = Query(
             else:
                 meshy_results = await generate_multiple_models(prompts_to_generate)
 
-        # map results back to processed_components using prompts_to_pc_index
-        result_by_pc_index = {}
-        for i, res in enumerate(meshy_results):
-            pc_idx = prompts_to_pc_index[i]
-            result_by_pc_index[pc_idx] = res
-
-        # Menggabungkan semua hasil (menggunakan BASE_LAND_URL for base)
         final_assets = []
-        for pc_idx, comp in enumerate(processed_components):
-            # If component is base (original_id==1 or id==0), use static BASE_LAND_URL
+        meshy_idx = 0
+        for comp in processed_components:
             if comp.get("original_id") == 1 or comp.get("id") == 0:
                 final_url = BASE_LAND_URL
             else:
-                res = result_by_pc_index.get(pc_idx)
-                if isinstance(res, Exception) or res is None:
-                    print(f"❌ Error rendering {comp['name']}: {res}")
-                    final_url = None
-                else:
-                    model_url = res.get("model_url")
-                    if model_url:
-                        # dry_run: stock URLs are already public, skip re-uploading
-                        final_url = model_url if dry_run else await upload_meshy_to_supabase(comp["name"], model_url)
-                    else:
+                if meshy_idx < len(meshy_results):
+                    res = meshy_results[meshy_idx]
+                    if isinstance(res, Exception) or res is None:
                         final_url = None
+                    else:
+                        model_url = res.get("model_url")
+                        if model_url:
+                            from services.supabase_engine import upload_meshy_to_supabase
+                            final_url = model_url if dry_run else await upload_meshy_to_supabase(comp["name"], model_url)
+                        else:
+                            final_url = None
+                    meshy_idx += 1
+                else:
+                    final_url = None
 
             final_assets.append({
-                "asset_id": comp["id"],
-                "name": comp["name"],
-                "description": comp["description"],
-                "model_url": final_url,
-                "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),  # Skala proporsional dari Gemini reasoning
-                "position_hint": comp.get("position_hint", "center"), # Hint posisi grid dari Gemini
+                "asset_id": comp["id"], "name": comp["name"],
+                "description": comp["description"], "model_url": final_url,
+                "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),
+                "position_hint": comp.get("position_hint", "center"),
                 "spatial_data": comp["spatial_data"],
-                "vision_detection": comp["visual_data"]
+                "vision_detection": comp["visual_data"],
             })
 
-        # --- SEMUA HASIL ---
         response_payload = {
             "status": "success",
             "project_context": {
                 "concept": analysis_result.get("green_solution", {}).get("concept_name", "Eco Design"),
-                "gemini_full_report": analysis_result
+                "gemini_full_report": analysis_result,
             },
-            "assets": final_assets
+            "assets": final_assets,
         }
 
-        # Simpan History JSON ke Supabase PostgreSQL
         save_project_to_db(response_payload)
-
         return response_payload
 
     except Exception as e:
-        print(f"❌ Error di Router: {e}")
+        print(f"❌ [LEGACY] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
