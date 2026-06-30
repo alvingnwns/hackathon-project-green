@@ -65,23 +65,23 @@
 ## 🔴 Phase 3: Image Processing & Conditional Logic
 
 ### Task 3.1 — Vision Engine (`vision_engine.py`)
-- [ ] Verifikasi `find_target_object()` dapat mendeteksi objek di gambar
-- [ ] Test dengan beberapa `target_label` dan `position_hint`
-- [ ] Pastikan fallback ke center image jika deteksi gagal
+- [x] Verifikasi `find_target_object()` dapat mendeteksi objek di gambar
+- [x] Test dengan beberapa `target_label` dan `position_hint`
+- [x] Pastikan fallback ke center image jika deteksi gagal
 
 ### Task 3.2 — Depth Engine (`depth_engine.py`)
-- [ ] Verifikasi `extract_depth_at_pixel()` menghasilkan data spasial yang valid
-- [ ] Test dengan koordinat u, v dari Vision Engine
-- [ ] Pastikan data `depth`, `x`, `y`, `z` ada di output
+- [x] Verifikasi `extract_depth_at_pixel()` menghasilkan data spasial yang valid
+- [x] Test dengan koordinat u, v dari Vision Engine
+- [x] Pastikan data `depth`, `x`, `y`, `z` ada di output
 
 ### Task 3.3 — Collision Engine (`collision_engine.py`)
-- [ ] Test `resolve_collisions()` dengan beberapa komponen yang tumpang tindih
-- [ ] Pastikan `position_hint` di-grid dengan benar (3x3 grid)
-- [ ] Cek tidak ada 2 objek di grid yang sama
+- [x] Test `resolve_collisions()` dengan beberapa komponen yang tumpang tindih
+- [x] Pastikan `position_hint` di-grid dengan benar (3x3 grid)
+- [x] Cek tidak ada 2 objek di grid yang sama
 
 ### Task 3.4 — Conditional Logic: "Already Green?"
-- [ ] Konfirmasi parameter `is_already_green` dari Gemini mengalir ke gatekeeper
-- [ ] Test edge case: gambar setengah hijau, gambar indoor, gambar gelap
+- [x] Konfirmasi parameter `is_already_green` dari Gemini mengalir ke gatekeeper
+- [x] Test edge case: gambar setengah hijau, gambar indoor, gambar gelap
 
 > **📌 Push ke Github setelah Phase 3 selesai!**
 

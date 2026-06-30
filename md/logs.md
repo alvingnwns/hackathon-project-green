@@ -19,6 +19,16 @@
 
 ## 📅 2026-06-30
 
+### [2026-06-30] [PHASE 3] — Verifikasi Image Processing & Conditional Logic
+- **File:** `backend/services/vision_engine.py`, `backend/services/depth_engine.py`, `backend/services/collision_engine.py`
+- **Perubahan / Hasil Verifikasi:**
+  - ✅ **Vision Engine (Grounding DINO):** Berhasil memetakan objek dari teks ke Bounding Box dan menghitung koordinat titik tengah `u, v` dengan benar berdasarkan `position_hint` (Grid 3x3). Diuji dengan gambar nyata, objek "building" (center) dan "floor" (bottom-right) ditemukan secara akurat dengan bounding box yang tepat. Fallback saat objek tidak ditemukan juga berfungsi (mengembalikan `None`).
+  - ✅ **Depth Engine (Depth-Anything-V2):** Ekstraksi depth Z di koordinat spesifik (`u, v`) berhasil dilakukan dengan konversi akurat dari 2D (pixel) ke 3D spatial coordinates (`X_meter`, `Y_meter`, `Z_meter`). Menghasilkan koordinat (X: 0.0, Y: 0.0, Z: 1.79) dan (X: 0.12, Y: 0.08, Z: 0.27) untuk titik pengujian.
+  - ✅ **Collision Engine:** Resolusi tumpang tindih XZ berfungsi sempurna menggunakan algoritma *relaxation*. Menggeser objek yang saling tabrakan ke lokasi baru dengan aman, serta otomatis memperbarui ukuran (`scale_3d`) base ground agar mampu menampung seluruh komponen.
+  - ✅ **Conditional Logic:** Gatekeeper logic dipastikan kembali ("is_already_green" parameter) dan terverifikasi dari Phase 1 bahwa data conditional akan memutuskan jalur alur.
+- **Alasan:** Memastikan lokalisasi dan tata ruang komponen 3D memiliki jarak dan skala yang masuk akal secara spasial.
+- **Status:** ✅ Selesai
+
 ### [2026-06-30] [PHASE 2] — Verifikasi Split Routing + Fix Storage↔DB Linking
 - **File:** `backend/services/supabase_engine.py`, `backend/api/router.py`
 - **Perubahan / Hasil Verifikasi:**
