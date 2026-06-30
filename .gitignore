@@ -13,8 +13,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Documentation / Design notes (ignore entire md/ folder)
-md/
+# Documentation — ignore internal handouts, but track logs/errors/task
+md/handout_*
 
 # Design diagrams & screenshots (development artifacts)
 image.png
