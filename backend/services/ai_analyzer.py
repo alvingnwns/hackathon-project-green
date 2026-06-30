@@ -48,6 +48,7 @@ prompt = """
             {
             "id": 1,
             "to_generate": "nama beserta deskripsi detail objek (misal: 'modern timber gazebo', warnanya, dll)",
+            "sd_xl_prompt": "Prompt DALAM BAHASA INGGRIS untuk Stable Diffusion XL agar menghasilkan gambar objek ini dengan BACKGROUND POLOS/TRANSPARAN, background putih bersih, objek terisolasi, tanpa orang (contoh: 'A modern timber gazebo on clean white background, isometric view, architectural render style, no background'). PENTING: Background HARUS polos/transparan agar bisa diproses SF3D dengan baik.",
             "target_area": "deskripsikan MATERIAL FISIK asli di foto yang akan ditimpa dalam BAHASA INGGRIS (contoh: 'dirt ground')",
             "position_hint": "Tentukan posisi GRID 3x3: 'top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'. PENTING: TATA LETAK HARUS RAPI DAN LOGIS layaknya Arsitek (contoh: jalan ditaruh di bottom-center tembus ke center, gazebo di center, pohon di left dan right). JANGAN menaruh 2 objek di grid yang sama untuk menghindari tabrakan 3D.",
             "scale_3d": [1.0, 1.0, 1.0],

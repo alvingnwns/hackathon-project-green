@@ -1,26 +1,82 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 
-interface WorkshopLeftBarProps {
-  onDataLoaded: (data: any) => void;
-  isLoading: boolean;
-  setIsLoading: (loading: boolean) => void;
+const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+const BACKEND_URL = 'http://127.0.0.1:8000/api/v1';
+
+interface TaskPayload {
+  assets?: unknown[];
+  [key: string]: unknown;
 }
 
-export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading }: WorkshopLeftBarProps) {
+interface WorkshopLeftBarProps {
+  onDataLoaded: (data: TaskPayload) => void;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  onProgressUpdate?: (progress: string) => void;
+}
+
+export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading, onProgressUpdate }: WorkshopLeftBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+  const pollingRef = useRef<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-  const [dryRun, setDryRun] = useState(true); // default ON to protect Meshy credits
+  const [dryRun, setDryRun] = useState(true); // default ON to protect Modal credits
+
+  // Cleanup polling on unmount
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current !== null) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollTask = useCallback(async (taskId: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/tasks/${taskId}`);
+      if (!response.ok) {
+        throw new Error(`Polling failed: ${response.status}`);
+      }
+
+      const taskData = await response.json();
+      
+      // Update progress
+      const progressMsg = taskData.progress || '';
+      setUploadStatus(progressMsg);
+      onProgressUpdate?.(progressMsg);
+
+      if (taskData.status === 'completed') {
+        stopPolling();
+        if (taskData.result) {
+          onDataLoaded(taskData.result);
+        } else if (taskData.result?.is_already_green) {
+          alert(taskData.result.rejection_reason || 'This image is already a green ecosystem.');
+        }
+        setUploadStatus(null);
+        setIsLoading(false);
+      } else if (taskData.status === 'failed') {
+        stopPolling();
+        alert(`Pipeline failed: ${taskData.error || 'Unknown error'}`);
+        setUploadStatus(null);
+        setIsLoading(false);
+      }
+      // If status is 'queued' or 'processing', keep polling
+    } catch (err) {
+      stopPolling();
+      alert(`Cannot connect to server: ${err}`);
+      setUploadStatus(null);
+      setIsLoading(false);
+    }
+  }, [onDataLoaded, setIsLoading, onProgressUpdate, stopPolling]);
 
   const handleImageUpload = async (file: File) => {
     setIsLoading(true);
-    setUploadStatus(dryRun ? 'Simulation mode — skipping Meshy API...' : 'Analyzing image with AI...');
+    setUploadStatus('Starting pipeline...');
     const formData = new FormData();
     formData.append('file', file);
 
     const url = dryRun
-      ? 'http://127.0.0.1:8000/api/v1/process-landscape?dry_run=true'
-      : 'http://127.0.0.1:8000/api/v1/process-landscape';
+      ? `${BACKEND_URL}/process-landscape?dry_run=true`
+      : `${BACKEND_URL}/process-landscape`;
 
     try {
       const response = await fetch(url, {
@@ -30,17 +86,27 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        alert('Error: ' + ((err as any).detail || 'An error occurred while processing the image'));
+        const errData = err as Record<string, string>;
+        alert('Error: ' + (errData.detail || 'An error occurred while processing the image'));
+        setIsLoading(false);
+        setUploadStatus(null);
         return;
       }
 
-      const data = await response.json();
-      onDataLoaded(data);
-      setUploadStatus(null);
+      // Get task_id and start polling
+      const taskResponse = await response.json();
+      const taskId = taskResponse.task_id;
+      
+      setUploadStatus('Pipeline queued. Processing your image...');
+      
+      // Start polling
+      pollingRef.current = window.setInterval(() => {
+        pollTask(taskId);
+      }, POLL_INTERVAL_MS);
+
     } catch {
       alert('Cannot connect to server. Make sure the backend is running on port 8000.');
       setUploadStatus(null);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -98,7 +164,7 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
       </button>
 
       {/* Simulation Mode toggle */}
-      <label className="flex items-center gap-2 cursor-pointer select-none" title="Simulation mode: skips Meshy API and uses stock GLBs. Disable only for production.">
+      <label className="flex items-center gap-2 cursor-pointer select-none" title="Simulation mode: skips Modal.com GPU pipeline and uses stock GLBs. Disable only for production.">
         <div
           className="relative w-9 h-5 rounded-full transition-colors"
           style={{ backgroundColor: dryRun ? 'var(--color-brand-green)' : 'var(--color-border)' }}
@@ -142,13 +208,20 @@ export default function WorkshopLeftBar({ onDataLoaded, isLoading, setIsLoading 
         Upload JSON History
       </button>
 
-      {/* Status text */}
+      {/* Progress Status */}
       {uploadStatus && (
-        <p className="text-xs text-center mt-2" style={{ color: 'var(--color-text-secondary)' }}>
-          {uploadStatus}
-        </p>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
+            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              Processing...
+            </p>
+          </div>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            {uploadStatus}
+          </p>
+        </div>
       )}
     </div>
   );
 }
-

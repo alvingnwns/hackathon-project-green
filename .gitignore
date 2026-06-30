@@ -12,3 +12,11 @@ frontend/dist/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Documentation — ignore internal handouts, but track logs/errors/task
+md/handout_*
+
+# Design diagrams & screenshots (development artifacts)
+image.png
+test.json
+newFlow.excalidraw
