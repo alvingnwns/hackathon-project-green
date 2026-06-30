@@ -19,6 +19,20 @@
 
 ## 📅 2026-06-30
 
+### [2026-06-30] [PHASE 2] — Verifikasi Split Routing + Fix Storage↔DB Linking
+- **File:** `backend/services/supabase_engine.py`, `backend/api/router.py`
+- **Perubahan / Hasil Verifikasi:**
+  - ✅ Bucket `raw_images` dan `glb_models` keduanya sudah ada di Supabase Storage
+  - ✅ `upload_raw_image()` berhasil upload dan mengembalikan public URL
+  - ✅ Tabel `projects` ada di Supabase DB dengan kolom: `id`, `created_at`, `concept_name`, `estimated_cost`, `raw_json`
+  - ✅ `save_project_to_db()` berhasil insert dan mengembalikan row dengan ID
+  - 🔧 **FIX:** `raw_image_url` sebelumnya hanya disimpan di in-memory `_task_store`, tidak di DB
+  - 🔧 **FIX:** Update signature `save_project_to_db(payload, raw_image_url=None)` — URL di-embed ke dalam `raw_json` tanpa perlu ALTER TABLE
+  - 🔧 **FIX:** `router.py` line 268 → pass `raw_image_url` dari `_task_store` ke DB save
+  - ✅ **Linking VERIFIED:** `raw_image_url` tersimpan di `raw_json` dan bisa di-fetch kembali via `get_project_by_id()`
+- **Alasan:** Memastikan Storage Branch (Blue) dan Data Branch (Red) ter-link sesuai arsitektur Phase 2
+- **Status:** ✅ Selesai
+
 ### [2026-06-30] [PHASE 1] — Verifikasi & Validasi Ingestion & Routing Pipeline
 - **File:** `backend/main.py`, `backend/api/router.py`, `backend/services/ai_analyzer.py`
 - **Perubahan / Hasil Verifikasi:**
