@@ -45,18 +45,18 @@
 ## 🟠 Phase 2: Split Routing — Data & Object
 
 ### Task 2.1 — Supabase Storage: Upload Raw Image (`supabase_engine.py`)
-- [ ] Verifikasi bucket `raw_images` ada di Supabase Dashboard
-- [ ] Test fungsi `upload_raw_image()` dengan gambar nyata
-- [ ] Pastikan public URL dikembalikan dengan benar
+- [x] Verifikasi bucket `raw_images` ada di Supabase Dashboard
+- [x] Test fungsi `upload_raw_image()` dengan gambar nyata
+- [x] Pastikan public URL dikembalikan dengan benar
 
 ### Task 2.2 — Supabase Database: Simpan Metadata Gemini
-- [ ] Verifikasi tabel `projects` ada di Supabase Database
-- [ ] Test fungsi `save_project_to_db()` dengan payload dummy
-- [ ] Pastikan `concept_name`, `estimated_cost`, `raw_json` tersimpan
+- [x] Verifikasi tabel `projects` ada di Supabase Database
+- [x] Test fungsi `save_project_to_db()` dengan payload dummy
+- [x] Pastikan `concept_name`, `estimated_cost`, `raw_json` tersimpan
 
 ### Task 2.3 — Linking: Storage URL → Database
-- [ ] Pastikan `raw_image_url` di-store di `_task_store` dan bisa dikaitkan ke DB entry
-- [ ] Cek apakah perlu menambahkan kolom `raw_image_url` ke tabel `projects`
+- [x] Pastikan `raw_image_url` di-store di `_task_store` dan bisa dikaitkan ke DB entry
+- [x] Cek apakah perlu menambahkan kolom `raw_image_url` ke tabel `projects`
 
 > **📌 Push ke Github setelah Phase 2 selesai!**
 

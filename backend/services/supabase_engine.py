@@ -27,6 +27,41 @@ def _get_unique_filename(name: str, extension: str = ".glb") -> str:
     return f"{clean_name}_{uuid.uuid4().hex[:8]}{extension}"
 
 
+def _ensure_bucket(bucket_name: str) -> bool:
+    """
+    Cek apakah bucket ada di Supabase Storage. Jika belum, buat otomatis.
+    Returns True jika bucket ready/siap, False jika gagal.
+    """
+    if not supabase:
+        return False
+    try:
+        # Coba list buckets
+        buckets = supabase.storage.list_buckets()
+        existing = [b.name for b in buckets]
+
+        if bucket_name not in existing:
+            print(f"🪣 Bucket '{bucket_name}' belum ada. Membuat otomatis...")
+            supabase.storage.create_bucket(
+                id=bucket_name,
+                name=bucket_name,
+                options={"public": True}
+            )
+            print(f"✅ Bucket '{bucket_name}' berhasil dibuat!")
+        else:
+            print(f"✅ Bucket '{bucket_name}' sudah tersedia.")
+
+        # Pastikan bucket public
+        supabase.storage.update_bucket(
+            id=bucket_name,
+            options={"public": True}
+        )
+        return True
+    except Exception as e:
+        print(f"⚠️ Gagal mengecek/membuat bucket '{bucket_name}': {e}")
+        print(f"   Buat bucket '{bucket_name}' manual di Supabase Dashboard > Storage > New Bucket (public)")
+        return False
+
+
 async def upload_raw_image(image_bytes: bytes, original_filename: str = "upload") -> Optional[str]:
     """
     Upload a raw image (from user upload) to Supabase Storage bucket 'raw_images'.
@@ -43,6 +78,10 @@ async def upload_raw_image(image_bytes: bytes, original_filename: str = "upload"
         return None
 
     bucket_name = settings.SUPABASE_BUCKET_RAW  # "raw_images"
+    if not _ensure_bucket(bucket_name):
+        print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload raw image.")
+        return None
+
     try:
         # Determine file extension from original filename
         ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
@@ -80,6 +119,10 @@ async def upload_glb_bytes(asset_name: str, glb_bytes: bytes) -> Optional[str]:
         return None
 
     bucket_name = settings.SUPABASE_BUCKET_GLB  # "glb_models"
+    if not _ensure_bucket(bucket_name):
+        print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload GLB.")
+        return None
+
     try:
         unique_filename = _get_unique_filename(asset_name, ".glb")
 
@@ -126,9 +169,14 @@ async def upload_meshy_to_supabase(asset_name: str, meshy_url: str) -> str:
         return meshy_url
 
 
-def save_project_to_db(payload: dict) -> dict:
+def save_project_to_db(payload: dict, raw_image_url: Optional[str] = None) -> dict:
     """
     Menyimpan metadata project dan raw JSON ke tabel 'projects' di Supabase Database.
+
+    Args:
+        payload: Full pipeline result payload dict.
+        raw_image_url: Public URL of the raw uploaded image (from Supabase Storage).
+                       Disematkan ke dalam raw_json agar ter-link ke storage asset.
     """
     if not supabase:
         print("⚠️ Supabase belum di-setup, melewati proses simpan ke database.")
@@ -138,6 +186,11 @@ def save_project_to_db(payload: dict) -> dict:
         full_report = payload.get("project_context", {}).get("gemini_full_report", {})
         concept = payload.get("project_context", {}).get("concept", "Untitled Project")
         cost = full_report.get("green_solution", {}).get("estimated_cost", 0)
+
+        # Embed raw_image_url ke dalam payload sebelum disimpan ke DB
+        # Ini menghindari ALTER TABLE dan tetap menjaga linking Storage ↔ DB
+        if raw_image_url:
+            payload["raw_image_url"] = raw_image_url
 
         db_payload = {
             "concept_name": concept,
