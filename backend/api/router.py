@@ -31,16 +31,17 @@ from pillow_heif import register_heif_opener
 
 from core.config import settings
 from services.ai_analyzer import analyze_landscape
-from services.depth_engine import get_fov_from_exif, pixel_to_3d, extract_depth_at_pixel
+from services.depth_engine import get_fov_from_exif, pixel_to_3d, depth_estimator, extract_depth_at_pixel
 from services.vision_engine import find_target_object
 from services.modal_engine import modal_engine, ModalPipelineError
-from services.collision_engine import resolve_collisions
 from services.supabase_engine import (
     upload_raw_image,
     upload_glb_bytes,
     save_project_to_db,
     get_project_by_id,
 )
+
+import numpy as np
 
 register_heif_opener()
 router = APIRouter()
@@ -58,6 +59,8 @@ STOCK_MODELS = [
     f"{SUPABASE_PUBLIC}/integrated_vertical_greenhouse_fc0b529a.glb",
     f"{SUPABASE_PUBLIC}/industrial_solar_panel_array_o_8eb8e6cd.glb",
     f"{SUPABASE_PUBLIC}/set_of_three_color-coded_recyc_4debc1f8.glb",
+    f"{SUPABASE_PUBLIC}/triple-compartment_recycled_pl_196d2497.glb",
+    f"{SUPABASE_PUBLIC}/industrial_recycled_steel_gree_bccd392d.glb"
 ]
 BASE_LAND_URL = f"{SUPABASE_PUBLIC}/flat_permaculture_soil_base_wi_c5e93b92.glb"
 
@@ -204,10 +207,6 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                     "name": prompt_3d,
                 })
 
-        # 4.5 Resolve Collisions
-        _task_store[task_id]["progress"] = "Resolving spatial collisions..."
-        processed_components = resolve_collisions(processed_components)
-
         # 5. Run Modal pipeline for non-base components
         final_modal_results = []
         if prompts_for_modal:
@@ -231,15 +230,6 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                 for res in modal_raw_results:
                     if res["glb_bytes"] and not res["error"]:
                         glb_url = await upload_glb_bytes(res["name"], res["glb_bytes"])
-                        
-                        # Fallback jika Supabase gagal/mati
-                        if not glb_url:
-                            import os
-                            os.makedirs("static/models", exist_ok=True)
-                            safe_name = f"{uuid.uuid4().hex[:8]}.glb"
-                            with open(f"static/models/{safe_name}", "wb") as f:
-                                f.write(res["glb_bytes"])
-                            glb_url = f"http://127.0.0.1:8000/static/models/{safe_name}"
                         final_modal_results.append({
                             "name": res["name"],
                             "model_url": glb_url,
@@ -265,9 +255,8 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
             "assets": final_assets,
         }
 
-        # 7. Save to DB (with raw_image_url linking Storage ↔ DB)
-        raw_image_url = _task_store[task_id].get("raw_image_url")
-        save_project_to_db(response_payload, raw_image_url=raw_image_url)
+        # 7. Save to DB
+        save_project_to_db(response_payload)
 
         # 8. Finalize task
         _task_store[task_id]["status"] = "completed"
@@ -361,4 +350,128 @@ async def get_project(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
 
-
+
+# ──────────────────────────────────────────────
+# [LEGACY] GET /api/v1/process-landscape-sync
+# Kept for backward compatibility
+# ──────────────────────────────────────────────
+@router.post("/process-landscape-sync")
+async def process_landscape_sync(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="Skip Meshy API — use stock GLBs instead"),
+):
+    """
+    [LEGACY] Original synchronous pipeline using Meshy.
+    Kept for backward compatibility. New code should use /process-landscape (async).
+    """
+    from services.meshy_engine import generate_multiple_models
+
+    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Format file tidak didukung.")
+
+    try:
+        img_bytes = await file.read()
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        width, height = img.size
+
+        print("➡️ [LEGACY] Running Gemini Analysis...")
+        analysis_json_str = analyze_landscape(img)
+        analysis_result = json.loads(analysis_json_str)
+
+        if analysis_result.get("is_already_green"):
+            reason = analysis_result.get("rejection_reason", "Image already green.")
+            raise HTTPException(status_code=400, detail=reason)
+
+        components = analysis_result.get("components_for_3d", [])
+        processed_components = []
+        prompts_to_generate = []
+
+        for idx, item in enumerate(components):
+            prompt_3d = item.get("to_generate", "building")
+            raw_target = item.get("target_area", "ground")
+            position_hint = item.get("position_hint", "middle")
+            original_item_id = item.get("id")
+
+            target_label = "ground" if "LAHAN KOSONG" in raw_target.upper() else raw_target
+
+            vision_data = find_target_object(img, target_label, position_hint)
+            if not vision_data:
+                vision_data = {
+                    "label": target_label, "confidence": 0.0, "bounding_box": None,
+                    "center_coordinate": {"u": width // 2, "v": height // 2},
+                    "warning": "Fallback to center."
+                }
+
+            target_u = vision_data["center_coordinate"]["u"]
+            target_v = vision_data["center_coordinate"]["v"]
+            spatial_data = extract_depth_at_pixel(img, target_u, target_v)
+
+            pc_index = len(processed_components)
+            processed_components.append({
+                "id": idx, "original_id": original_item_id,
+                "name": prompt_3d, "description": item.get("description", ""),
+                "visual_data": vision_data, "spatial_data": spatial_data,
+                "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]),
+                "position_hint": item.get("position_hint", "center"),
+            })
+
+            if original_item_id == 1 or idx == 0:
+                continue
+            prompts_to_generate.append(prompt_3d)
+
+        print(f"➡️ [LEGACY] Generating {len(prompts_to_generate)} 3D models via Meshy...")
+        meshy_results = []
+        if prompts_to_generate:
+            if dry_run:
+                meshy_results = [
+                    {"model_url": STOCK_MODELS[i % len(STOCK_MODELS)]}
+                    for i in range(len(prompts_to_generate))
+                ]
+            else:
+                meshy_results = await generate_multiple_models(prompts_to_generate)
+
+        final_assets = []
+        meshy_idx = 0
+        for comp in processed_components:
+            if comp.get("original_id") == 1 or comp.get("id") == 0:
+                final_url = BASE_LAND_URL
+            else:
+                if meshy_idx < len(meshy_results):
+                    res = meshy_results[meshy_idx]
+                    if isinstance(res, Exception) or res is None:
+                        final_url = None
+                    else:
+                        model_url = res.get("model_url")
+                        if model_url:
+                            from services.supabase_engine import upload_meshy_to_supabase
+                            final_url = model_url if dry_run else await upload_meshy_to_supabase(comp["name"], model_url)
+                        else:
+                            final_url = None
+                    meshy_idx += 1
+                else:
+                    final_url = None
+
+            final_assets.append({
+                "asset_id": comp["id"], "name": comp["name"],
+                "description": comp["description"], "model_url": final_url,
+                "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),
+                "position_hint": comp.get("position_hint", "center"),
+                "spatial_data": comp["spatial_data"],
+                "vision_detection": comp["visual_data"],
+            })
+
+        response_payload = {
+            "status": "success",
+            "project_context": {
+                "concept": analysis_result.get("green_solution", {}).get("concept_name", "Eco Design"),
+                "gemini_full_report": analysis_result,
+            },
+            "assets": final_assets,
+        }
+
+        save_project_to_db(response_payload)
+        return response_payload
+
+    except Exception as e:
+        print(f"❌ [LEGACY] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
