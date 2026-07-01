@@ -1,9 +1,9 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from core.config import settings
 
-# Konfigurasi Gemini
-genai.configure(api_key=settings.GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-3-flash-preview')
+# Konfigurasi Gemini menggunakan package baru google.genai
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 prompt = """
         Role: Kamu adalah Environment Designer & Structural Analyst untuk proyek "Green Innovation".
@@ -59,16 +59,30 @@ prompt = """
         }
         """
 
-def analyze_landscape(image):
-    response = model.generate_content(
-        [prompt, image],
-        generation_config={"response_mime_type": "application/json"}
-    )
+import time
 
-    raw_text = response.text.strip()
-    if raw_text.startswith("```json"):
-        raw_text = raw_text.replace("```json", "", 1)
+def analyze_landscape(image, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3-flash-preview',
+                contents=[prompt, image],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
 
-    if raw_text.endswith("```"):
-        raw_text = raw_text[: -3]
-    return raw_text.strip()
+            raw_text = response.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text.replace("```json", "", 1)
+
+            if raw_text.endswith("```"):
+                raw_text = raw_text[: -3]
+            return raw_text.strip()
+        except Exception as e:
+            error_str = str(e)
+            if "503" in error_str and attempt < max_retries - 1:
+                print(f"⚠️ Server Gemini sibuk (503). Mencoba lagi dalam 5 detik... (Percobaan {attempt + 1}/{max_retries})")
+                time.sleep(5)
+            else:
+                raise e

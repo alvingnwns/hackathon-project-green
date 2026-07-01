@@ -25,6 +25,8 @@ class ModalPipelineError(Exception):
     pass
 
 
+import modal
+
 class ModalEngine:
     """
     Orchestrates the parallel pipeline: SD-XL → SF3D for multiple components.
@@ -38,8 +40,14 @@ class ModalEngine:
     """
 
     def __init__(self):
-        self._sd_generator = SDXLGenerator()
-        self._sf3d_generator = SF3DGenerator()
+        # We look up the deployed classes so this engine can be called 
+        # from anywhere (e.g. FastAPI) without being inside a modal app context.
+        print("🔍 Looking up deployed Modal endpoints...")
+        sd_cls = modal.Cls.from_name("greenscape-sd-xl", "SDXLGenerator")
+        sf3d_cls = modal.Cls.from_name("greenscape-sf3d", "SF3DGenerator")
+        
+        self._sd_generator = sd_cls()
+        self._sf3d_generator = sf3d_cls()
 
     async def _run_sd_xl(self, prompt: str) -> bytes:
         """

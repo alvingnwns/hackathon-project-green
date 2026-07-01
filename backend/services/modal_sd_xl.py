@@ -3,7 +3,7 @@ Modal.com serverless deployment for SD-XL 1.0 base model.
 Generates images from text prompts (image-to-image pipeline without input image).
 
 Architecture:
-  - Deploys on Modal's Nvidia A100 40GB
+  - Deploys on Modal's Nvidia A10G 24GB
   - Text-to-Image generation with Stable Diffusion XL 1.0 base
   - Output: clean image with plain/transparent background for SF3D
 """
@@ -20,7 +20,7 @@ sd_image = (
     modal.Image.from_registry(
         "nvidia/cuda:12.4.0-devel-ubuntu22.04",
         setup_dockerfile_commands=[
-            "RUN apt-get update && apt-get install -y python3 python3-pip git",
+            "RUN apt-get update && apt-get install -y python3 python3-pip git python-is-python3",
         ]
     )
     .pip_install(
@@ -40,14 +40,12 @@ MODEL_NAME = "stabilityai/stable-diffusion-xl-base-1.0"
 
 @app.cls(
     image=sd_image,
-    gpu="A100",
+    gpu="A10G",
     timeout=300,
-    container_idle_timeout=120,
-    keep_warm=1,  # Keep 1 container warm to reduce cold starts
 )
 class SDXLGenerator:
-    def __init__(self):
-        self.pipe = None
+    # Model diinisialisasi secara dinamis di load_model (modal.enter),
+    # menghindari constructor __init__ yang tidak didukung Modal.
 
     @modal.enter()
     def load_model(self):
@@ -115,18 +113,6 @@ class SDXLGenerator:
         """Lightweight method to keep the container alive without generating."""
         return "SD-XL container is warm"
 
-# --- Keep warm schedule to prevent cold starts ---
-@app.function(
-    image=sd_image,
-    schedule=modal.Period(minutes=10),
-)
-def keep_warm():
-    """Keep the SD-XL container warm to minimize cold start latency."""
-    generator = SDXLGenerator()
-    generator.warm.remote()
-    print("⏰ Keep-warm ping sent to SD-XL container")
-
-
 # --- Standalone test ---
 @app.local_entrypoint()
 def main():
@@ -134,7 +120,7 @@ def main():
     test_prompt = "A single modern solar panel on clean white background, isometric view, professional product photography"
     print("🧪 Testing SD-XL generation...")
     img_bytes = generator.generate.remote(test_prompt)
-    output_path = "/tmp/test_sdxl_output.png"
+    output_path = "test_sdxl_output.png"
     with open(output_path, "wb") as f:
         f.write(img_bytes)
     print(f"✅ Test image saved to {output_path} ({len(img_bytes) / 1024:.1f} KB)")

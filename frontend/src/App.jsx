@@ -30,33 +30,17 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// === Sistem Posisi Grid 3x3 ===
-// Dikalkulasi dari rumus: 3 baris × 3 kolom dengan jarak GRID_SPACING meter.
-// Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari nama posisi.
-const GRID_SPACING = 3.0;
-const GRID_POSITIONS = Object.fromEntries(
-  ["top", "center", "bottom"].flatMap((row, ri) =>
-    ["left", "center", "right"].map((col, ci) => {
-      const key = row === "center" && col === "center" ? "center" : `${row}-${col}`;
-      return [key, [(ci - 1) * GRID_SPACING, (ri - 1) * GRID_SPACING]];
-    })
-  )
-);
-const FALLBACK_HINTS = Object.keys(GRID_POSITIONS);
+// Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari Backend (collision_engine).
 
 // Komponen Sub untuk Me-render file GLB satuan
-function GLTFModel({ url, index, scaleJSON, positionHint, clusterCenter }) {
+function GLTFModel({ url, index, scaleJSON, spatialData, clusterCenter }) {
   const { scene } = useGLTF(url);
   const isBase = index === 0;
 
-  // Tentukan slot grid berdasarkan positionHint dari Gemini.
-  // Jika hint tidak valid, fallback ke slot urutan berdasarkan index agar tidak overlap.
-  const hint = (!isBase && positionHint && GRID_POSITIONS[positionHint])
-    ? positionHint
-    : FALLBACK_HINTS[Math.max(0, index - 1) % FALLBACK_HINTS.length];
-
-  let finalX = isBase ? 0 : GRID_POSITIONS[hint][0];
-  let finalZ = isBase ? 0 : GRID_POSITIONS[hint][1];
+  // Koordinat X dan Z didapat langsung dari Backend yang sudah diproses agar tidak tabrakan
+  const coords = spatialData?.spatial_3d_coordinates || {};
+  let finalX = isBase ? 0 : (coords.X_meter || 0);
+  let finalZ = isBase ? 0 : (coords.Z_meter || 0);
 
   // Rotasi acak antara -10 hingga 10 derajat untuk objek selain base
   const [randomRotationY] = useState(() => {
@@ -136,13 +120,35 @@ function App() {
     formData.append("file", file);
 
     try {
-      // Endpoint ke FastAPI Backend
-      const res = await axios.post("http://127.0.0.1:8000/api/v1/process-landscape", formData);
-      setResultData(res.data);
+      // 1. Submit file to start async pipeline
+      const submitRes = await axios.post("http://127.0.0.1:8000/api/v1/process-landscape", formData);
+      const taskId = submitRes.data.task_id;
+      
+      if (!taskId) {
+        throw new Error("No task ID returned from server.");
+      }
+
+      // 2. Poll the status endpoint until completed or failed
+      let isDone = false;
+      while (!isDone) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        
+        const statusRes = await axios.get(`http://127.0.0.1:8000/api/v1/tasks/${taskId}`);
+        const taskData = statusRes.data;
+        
+        if (taskData.status === "completed") {
+          setResultData(taskData.result);
+          isDone = true;
+        } else if (taskData.status === "failed") {
+          alert("Pipeline failed: " + taskData.error);
+          isDone = true;
+        }
+        // If status is queued or processing, it will loop again
+      }
+
     } catch (error) {
       console.error("Error processing landscape:", error);
       if (error.response && error.response.status === 400 && error.response.data?.detail) {
-        // Tampilkan pesan alasan rejection dari backend (is_already_green)
         alert("INFO: " + error.response.data.detail);
       } else {
         alert("A system error occurred while processing the image.");
@@ -209,7 +215,7 @@ function App() {
                     url={asset.model_url} 
                     index={index}
                     scaleJSON={asset.scale_3d}
-                    positionHint={asset.position_hint}
+                    spatialData={asset.spatial_data}
                     clusterCenter={cameraTarget}
                   />
                 </ErrorBoundary>
@@ -277,7 +283,7 @@ function App() {
                     <div className="text-xs text-neutral-400">{asset.name?.split(":")[1] || ""}</div>
                     <div className="mt-2 text-[10px] text-neutral-500 flex justify-between">
                       <span>Label: {asset.vision_detection?.label || "N/A"}</span>
-                      <span>X: {asset.spatial_data?.spatial_3d_coordinates?.X_meter?.toFixed(2)}, Y: {asset.spatial_data?.spatial_3d_coordinates?.Y_meter?.toFixed(2)}</span>
+                      <span>X: {asset.spatial_data?.spatial_3d_coordinates?.X_meter?.toFixed(2)}, Z: {asset.spatial_data?.spatial_3d_coordinates?.Z_meter?.toFixed(2)}</span>
                     </div>
                   </div>
                 ))}
