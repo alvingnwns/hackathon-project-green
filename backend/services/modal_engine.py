@@ -11,13 +11,11 @@ All calls are dispatched to Modal.com serverless functions.
 import asyncio
 import io
 from typing import List, Optional
-from concurrent.futures import ThreadPoolExecutor
 
 from core.config import settings
 
 # Import Modal app classes
 from services.modal_sd_xl import SDXLGenerator
-from services.modal_sf3d import SF3DGenerator
 
 
 class ModalPipelineError(Exception):
@@ -41,65 +39,46 @@ class ModalEngine:
 
     def __init__(self):
         self._sd_generator = None
-        self._sf3d_generator = None
 
     def _ensure_initialized(self):
-        if self._sd_generator is None or self._sf3d_generator is None:
+        if self._sd_generator is None:
             print("🔍 Looking up deployed Modal endpoints...")
             sd_cls = modal.Cls.from_name("greenscape-sd-xl", "SDXLGenerator")
-            sf3d_cls = modal.Cls.from_name("greenscape-sf3d", "SF3DGenerator")
             self._sd_generator = sd_cls()
-            self._sf3d_generator = sf3d_cls()
 
     async def _run_sd_xl(self, prompt: str) -> bytes:
         """
-        Calls the SD-XL modal function using ThreadPoolExecutor to avoid blocking the event loop.
+        Calls the SD-XL modal function using native Modal async (.aio)
         """
         self._ensure_initialized()
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor() as pool:
-            # .remote(...) is a blocking call, so we run it in a thread
-            result = await loop.run_in_executor(pool, self._sd_generator.generate.remote, prompt)
-        return result
-
-    async def _run_sf3d(self, image_bytes: bytes) -> bytes:
+        # .remote.aio is Modal's native async caller
+        result = await self._sd_generator.generate.remote.aio(prompt)
+    async def generate_single_image(self, prompt: str) -> bytes:
         """
-        Calls the SF3D modal function using ThreadPoolExecutor.
-        """
-        self._ensure_initialized()
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor() as pool:
-            result = await loop.run_in_executor(pool, self._sf3d_generator.generate.remote, image_bytes)
-        return result
-
-    async def generate_single_3d(self, prompt: str) -> bytes:
-        """
-        Full SD-XL → SF3D pipeline for a single component.
+        SD-XL text-to-image pipeline for a single component.
 
         Args:
             prompt: The sd_xl_prompt from Gemini analysis.
 
         Returns:
-            .glb file bytes.
+            PNG file bytes.
 
         Raises:
-            ModalPipelineError: If either SD-XL or SF3D fails.
+            ModalPipelineError: If SD-XL fails.
         """
         try:
             print(f"🎨 [Modal] SD-XL generating image for prompt...")
             img_bytes = await self._run_sd_xl(prompt)
-            print(f"📐 [Modal] Image generated ({len(img_bytes) / 1024:.1f} KB). Running SF3D...")
-            glb_bytes = await self._run_sf3d(img_bytes)
-            print(f"✅ [Modal] GLB generated ({len(glb_bytes) / 1024:.1f} KB).")
-            return glb_bytes
+            print(f"✅ [Modal] Image generated ({len(img_bytes) / 1024:.1f} KB).")
+            return img_bytes
         except Exception as e:
             raise ModalPipelineError(f"Modal pipeline failed for prompt '{prompt[:60]}': {e}")
 
-    async def generate_multiple_3d(
+    async def generate_multiple_images(
         self, components: List[dict]
     ) -> List[dict]:
         """
-        Run parallel SD-XL → SF3D pipelines for multiple components.
+        Run parallel SD-XL pipelines for multiple components.
 
         Args:
             components: List of dicts, each with at least:
@@ -109,7 +88,7 @@ class ModalEngine:
         Returns:
             List of dicts, each with:
                 - "name": str — Component name
-                - "glb_bytes": bytes | None — GLB bytes (None if failed)
+                - "img_bytes": bytes | None — PNG bytes from SD-XL
                 - "error": str | None — Error message if failed
         """
         if not components:
@@ -125,7 +104,7 @@ class ModalEngine:
             else:
                 tasks.append(self._generate_single_wrapped(name, prompt))
 
-        print(f"🚀 [Modal] Launching {len(tasks)} parallel SD-XL → SF3D pipelines...")
+        print(f"🚀 [Modal] Launching {len(tasks)} parallel SD-XL pipelines...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         final_results = []
@@ -133,7 +112,7 @@ class ModalEngine:
             if isinstance(result, Exception):
                 final_results.append({
                     "name": components[i].get("name", f"component_{i}"),
-                    "glb_bytes": None,
+                    "img_bytes": None,
                     "error": str(result),
                 })
             else:
@@ -144,15 +123,15 @@ class ModalEngine:
     async def _generate_single_wrapped(self, name: str, prompt: str) -> dict:
         """Wrap single generation with error handling."""
         try:
-            glb_bytes = await self.generate_single_3d(prompt)
-            return {"name": name, "glb_bytes": glb_bytes, "error": None}
+            img_bytes = await self.generate_single_image(prompt)
+            return {"name": name, "img_bytes": img_bytes, "error": None}
         except Exception as e:
-            return {"name": name, "glb_bytes": None, "error": str(e)}
+            return {"name": name, "img_bytes": None, "error": str(e)}
 
     def _failed_result(self, name: str, error: str) -> dict:
         """Create a placeholder failed result."""
         future = asyncio.Future()
-        future.set_result({"name": name, "glb_bytes": None, "error": error})
+        future.set_result({"name": name, "img_bytes": None, "error": error})
         return future
 
 

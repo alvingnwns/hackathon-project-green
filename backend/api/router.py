@@ -36,6 +36,7 @@ from services.vision_engine import find_target_object
 from services.modal_engine import modal_engine, ModalPipelineError
 from services.supabase_engine import (
     upload_raw_image,
+    upload_generated_image,
     upload_glb_bytes,
     save_project_to_db,
     get_project_by_id,
@@ -85,24 +86,30 @@ def _build_final_assets(
 
         if is_base:
             model_url = BASE_LAND_URL
+            image_url = None
         else:
             if modal_idx < len(modal_results):
                 res = modal_results[modal_idx]
                 if res.get("error"):
                     print(f"⚠️ Modal failed for {comp['name']}: {res['error']}")
                     model_url = None
+                    image_url = None
                 else:
                     model_url = res.get("model_url")  # already uploaded to Supabase
+                    image_url = res.get("image_url")
                 modal_idx += 1
             else:
                 model_url = None
+                image_url = None
 
         final_assets.append({
             "asset_id": comp["id"],
             "name": comp["name"],
             "description": comp.get("description", ""),
             "model_url": model_url,
+            "image_url": image_url,
             "scale_3d": comp.get("scale_3d", [1.0, 1.0, 1.0]),
+            "relative_position": comp.get("relative_position", [0.0, 0.0, 0.0]),
             "position_hint": comp.get("position_hint", "center"),
             "spatial_data": comp.get("spatial_data", {}),
             "vision_detection": comp.get("visual_data", {}),
@@ -201,6 +208,7 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                 "visual_data": vision_data,
                 "spatial_data": spatial_data,
                 "scale_3d": item.get("scale_3d", [0.4, 0.4, 0.4]),
+                "relative_position": item.get("relative_position", [0.0, 0.0, 0.0]),
                 "position_hint": item.get("position_hint", "center"),
             }
             processed_components.append(pc_entry)
@@ -228,17 +236,32 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                         "error": None,
                     })
             else:
-                # Real Modal pipeline
-                modal_raw_results = await modal_engine.generate_multiple_3d(prompts_for_modal)
+                # Real pipeline: Modal for SD-XL, Local TRELLIS for 3D
+                modal_raw_results = await modal_engine.generate_multiple_images(prompts_for_modal)
 
-                # Upload each GLB to Supabase
+                from services.trellis_engine import generate_3d_local
+
+                # Process each image into 3D sequentially to protect VRAM
                 for res in modal_raw_results:
-                    if res["glb_bytes"] and not res["error"]:
-                        glb_url = await upload_glb_bytes(res["name"], res["glb_bytes"])
+                    if res.get("img_bytes") and not res.get("error"):
+                        _task_store[task_id]["progress"] = f"TRELLIS Generating 3D for {res['name']}..."
                         
-                        if not glb_url:
-                            # Fallback to local static directory
-                            print("⚠️ Fallback to local storage for GLB.")
+                        # Generate 3D
+                        try:
+                            glb_bytes = await generate_3d_local(res["img_bytes"])
+                        except Exception as e:
+                            print(f"⚠️ TRELLIS failed for {res['name']}: {e}")
+                            glb_bytes = None
+                            res["error"] = str(e)
+                            
+                        # Upload to Supabase
+                        if glb_bytes:
+                            glb_url = await upload_glb_bytes(res["name"], glb_bytes)
+                            img_url = await upload_generated_image(res["name"], res["img_bytes"])
+                            
+                            if not glb_url:
+                                # Fallback to local static directory
+                                print("⚠️ Fallback to local storage for GLB.")
                             local_dir = os.path.join(settings.STATIC_DIR, "models")
                             os.makedirs(local_dir, exist_ok=True)
                             
@@ -249,20 +272,22 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                             local_path = os.path.join(local_dir, filename)
                             
                             with open(local_path, "wb") as f:
-                                f.write(res["glb_bytes"])
+                                f.write(glb_bytes)
                             
                             glb_url = f"/static/models/{filename}"
                             
                         final_modal_results.append({
                             "name": res["name"],
                             "model_url": glb_url,
+                            "image_url": img_url,
                             "error": None,
                         })
                     else:
                         final_modal_results.append({
                             "name": res["name"],
                             "model_url": None,
-                            "error": res.get("error", "Unknown Modal error"),
+                            "image_url": None,
+                            "error": res.get("error", "Unknown pipeline error"),
                         })
 
         # 6. Assemble final output

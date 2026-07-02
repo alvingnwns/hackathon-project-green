@@ -110,6 +110,50 @@ async def upload_raw_image(image_bytes: bytes, original_filename: str = "upload"
         print(f"❌ Gagal upload raw image ke Supabase: {e}")
         return None
 
+async def upload_generated_image(asset_name: str, image_bytes: bytes) -> Optional[str]:
+    """
+    Upload a generated 2D image (from SD-XL) to Supabase Storage bucket 'raw_images'.
+
+    Args:
+        asset_name: Name of the asset (for filename).
+        image_bytes: The generated PNG image as bytes.
+
+    Returns:
+        Public URL of the uploaded image, or None on failure.
+    """
+    if not supabase:
+        return None
+
+    bucket_name = settings.SUPABASE_BUCKET_RAW
+    try:
+        unique_filename = _get_unique_filename(asset_name, ".png")
+
+        print(f"☁️ Mengunggah SDXL image ke Supabase Storage (bucket: {bucket_name})...")
+        
+        def _upload_img():
+            if not _ensure_bucket(bucket_name):
+                return False
+                
+            supabase.storage.from_(bucket_name).upload(
+                file=image_bytes,
+                path=unique_filename,
+                file_options={"content-type": "image/png"}
+            )
+            
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor() as pool:
+            await loop.run_in_executor(pool, _upload_img)
+
+        public_url = supabase.storage.from_(bucket_name).get_public_url(unique_filename)
+        print(f"✅ SDXL Image URL: {public_url}")
+        return public_url
+
+    except Exception as e:
+        print(f"❌ Gagal upload SDXL image ke Supabase: {e}")
+        return None
+
 
 async def upload_glb_bytes(asset_name: str, glb_bytes: bytes) -> Optional[str]:
     """

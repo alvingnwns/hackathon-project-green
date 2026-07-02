@@ -6,6 +6,7 @@ load_dotenv()
 class Settings:
     PROJECT_NAME = "GreenScape AI — 2D-to-3D Generative Pipeline"
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     HF_API_TOKEN = os.getenv("HF_API_TOKEN")
     MESHY_API_KEY = os.getenv("MESHY_API_KEY")
     SUPABASE_URL = os.getenv("SUPABASE_URL")

@@ -1,6 +1,8 @@
 from google import genai
 from google.genai import types
 from core.config import settings
+import time
+import json
 
 # Konfigurasi Gemini menggunakan package baru google.genai
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
@@ -14,18 +16,16 @@ prompt = """
         2. Jika lahan sudah hijau & rapi, set "is_already_green" menjadi "true", lalu berhenti (informasi lainnya boleh dikosongkan).
         3. Jika belum hijau (lahan kosong, terbengkalai, bangunan, rumput liar), lakukan analisis material bangunan (beton, kayu, besi) dan tingkat kerusakan.
         4. Keputusan Struktural: Lakukan penalaran (Reasoning) apakah bangunan lebih baik di-alihfungsikan (Retain), dihancurkan (Demolish), atau ditambah struktur hijau (Augment) berdasarkan prinsip biaya minimum dan emisi karbon terendah.
-        5. Early Segmentation: Identifikasi 3-5 komponen fisik utama yang perlu diubah menjadi aset 3D (jika lahan tidak kosong).
+        5. Early Segmentation: Identifikasi TEPAT 5 komponen fisik utama yang perlu diubah menjadi aset 3D (1 alas lahan + 4 objek di atasnya).
         6. Hapus Penghalang: Apabila terdeteksi object lain seperti manusia, hewan, hapus saja atau abaikan.
         7. Komponen Alas Wajib: Untuk `components_for_3d`, komponen PERTAMA (id: 1) WAJIB berupa pijakan dasar/landscape. PENTING: Deskripsikan alas ini sebagai permukaan yang benar-benar datar ("flat surface"), dan tegaskan bahwa rumput atau bebatuan HARUS berupa gambar tekstur saja ("2D texture only, no 3D grass geometry popping out", "completely flat geometry"). Ini krusial agar bounding box tidak menonjol. Skala objek ini WAJIB di-fix di [8.0, 0.5, 8.0] (contoh: "Flat permaculture soil base with painted 2D green grass texture").
-        8. Proportional Scaling Reasoning (WAJIB): Field `scale_3d` adalah KRITIS dan HARUS ada di setiap elemen `components_for_3d`. Lakukan penalaran bertahap: (a) Buat daftar semua objek dan ukuran fisiknya di dunia nyata (misal: Greenhouse = 6x4x4m, Solar Panel = 3x1x2m, Tong Sampah = 0.5x0.8x0.5m). (b) Urut dari terbesar ke terkecil. (c) Bangunan Utama (Gazebo, Greenhouse, Gubuk) WAJIB [3.0~5.0, 2.5~4.0, 3.0~5.0]. Objek Menengah (Panel Surya, Tangki Air) sekitar [1.2~2.0, 0.8~1.5, 1.0~1.8]. Objek Kecil (Tong Sampah, Pot, Tempat Sampah) WAJIB [0.2~0.5, 0.3~0.6, 0.2~0.5]. DILARANG KERAS menyamakan skala objek yang secara fisik jauh berbeda ukurannya. Tong sampah TIDAK BOLEH sebesar greenhouse!
+        8. KRITIKAL UNTUK 3D GENERATOR (SF3D): SF3D SANGAT BURUK dalam merender struktur berongga, pilar tipis, atap gazebo, pagar, atau kaca transparan (akan menjadi gumpalan leleh). KAMU WAJIB HANYA MEMBUAT OBJEK PADAT (SOLID/CHUNKY). Contoh yang BOLEH: "Solid stone raised planter box", "Closed wooden shed", "Solid water barrel", "Chunky compost bin", "Solid brick oven". Contoh yang DILARANG: "Gazebo", "Greenhouse", "Trellis", "Fences", "Thin poles".
+        9. Proportional Scaling Reasoning (WAJIB): Field `scale_3d` adalah KRITIS dan HARUS ada di setiap elemen `components_for_3d`. Lakukan penalaran bertahap: (a) Buat daftar semua objek dan ukuran fisiknya di dunia nyata. (b) Bangunan Utama/Solid Shed WAJIB [3.0~4.0, 2.5~3.0, 3.0~4.0]. Objek Menengah (Tangki Air) [1.2~2.0, 1.2~2.0, 1.2~2.0]. Objek Kecil (Tempat Sampah, Bak Tanam) [0.5~1.0, 0.5~1.0, 0.5~1.0]. 
 
         Rules & Constraints:
-        - Fokus pada "Low-Cost, High-Impact", jadi gunakan bangunan yang sudah ada (apabila ada) kecuali yang dikirim adalah lahan kosong.
-        - Jika bangunan dihancurkan, hitung estimasi debris (sampah konstruksi) dan solusi pengolahannya.
-        - Gunakan satuan metrik (meter) dan estimasi biaya dalam IDR (Rupiah).
+        - Fokus pada "Low-Cost, High-Impact", gunakan puing bangunan jika ada untuk membuat bak tanam (raised beds) atau jalan setapak.
         - Output HARUS selalu dalam format JSON agar dapat diproses oleh pipeline automated.
-        - Jika yang difoto ternyata adalah lahan kosong, sebisa mungkin jangan gunakan bahan baku kayu karena kayu berarti harus menebang pohon, carilah alternatif lain yang lebih eco-friendly dan solusi hijau.
-        - Jangan membuat lebih dari kapasitas / kapabilitas bahan bangunan yang ada dari foto, kecuali dia adalah lahan kosong baru boleh membuat max 4 object terutama
+        - WAJIB menghasilkan tepat 5 objek (termasuk alas).
 
         Output Structure (JSON & MUST BE IN ENGLISH):
         {
@@ -59,13 +59,11 @@ prompt = """
         }
         """
 
-import time
-
 def analyze_landscape(image, max_retries=5):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model='gemini-3-flash-preview',
+                model='gemini-3.5-flash',
                 contents=[prompt, image],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json"
@@ -78,11 +76,21 @@ def analyze_landscape(image, max_retries=5):
 
             if raw_text.endswith("```"):
                 raw_text = raw_text[: -3]
+            
+            # Verifikasi JSON valid
+            json.loads(raw_text)
+                
             return raw_text.strip()
         except Exception as e:
             error_str = str(e)
             if "503" in error_str and attempt < max_retries - 1:
                 print(f"⚠️ Server Gemini sibuk (503). Mencoba lagi dalam 5 detik... (Percobaan {attempt + 1}/{max_retries})")
                 time.sleep(5)
-            else:
+            elif "429" in error_str and attempt < max_retries - 1:
+                print(f"⚠️ Server Gemini Rate Limit (429). Mencoba lagi dalam 15 detik... (Percobaan {attempt + 1}/{max_retries})")
+                time.sleep(15)
+            elif attempt == max_retries - 1:
                 raise e
+            else:
+                print(f"⚠️ Error parsing JSON dari Gemini: {error_str}. Retrying...")
+                time.sleep(2)

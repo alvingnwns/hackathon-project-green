@@ -33,14 +33,15 @@ class ErrorBoundary extends React.Component {
 // Tidak ada koordinat per-objek yang dihardcode — semua dihitung otomatis dari Backend (collision_engine).
 
 // Komponen Sub untuk Me-render file GLB satuan
-function GLTFModel({ url, index, scaleJSON, spatialData, clusterCenter }) {
+function GLTFModel({ url, index, scaleJSON, relativePosition, clusterCenter }) {
   const { scene } = useGLTF(url);
   const isBase = index === 0;
 
-  // Koordinat X dan Z didapat langsung dari Backend yang sudah diproses agar tidak tabrakan
-  const coords = spatialData?.spatial_3d_coordinates || {};
-  let finalX = isBase ? 0 : (coords.X_meter || 0);
-  let finalZ = isBase ? 0 : (coords.Z_meter || 0);
+  // Koordinat X dan Z didapat langsung dari Gemini JSON (relative_position)
+  // Ini mengabaikan output spatial engine yang tadinya bermasalah
+  const coords = relativePosition || [0, 0, 0];
+  let finalX = isBase ? 0 : coords[0];
+  let finalZ = isBase ? 0 : coords[2];
 
   // Rotasi acak antara -10 hingga 10 derajat untuk objek selain base
   const [randomRotationY] = useState(() => {
@@ -220,7 +221,7 @@ function App() {
                     url={asset.model_url} 
                     index={index}
                     scaleJSON={asset.scale_3d}
-                    spatialData={asset.spatial_data}
+                    relativePosition={asset.relative_position}
                     clusterCenter={cameraTarget}
                   />
                 </ErrorBoundary>
@@ -293,7 +294,7 @@ function App() {
                     <div className="text-xs text-neutral-400">{asset.name?.split(":")[1] || ""}</div>
                     <div className="mt-2 text-[10px] text-neutral-500 flex justify-between">
                       <span>Label: {asset.vision_detection?.label || "N/A"}</span>
-                      <span>X: {asset.spatial_data?.spatial_3d_coordinates?.X_meter?.toFixed(2)}, Z: {asset.spatial_data?.spatial_3d_coordinates?.Z_meter?.toFixed(2)}</span>
+                      <span>X: {asset.relative_position?.[0]?.toFixed(2) || "0.00"}, Z: {asset.relative_position?.[2]?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                 ))}
