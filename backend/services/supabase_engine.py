@@ -78,21 +78,29 @@ async def upload_raw_image(image_bytes: bytes, original_filename: str = "upload"
         return None
 
     bucket_name = settings.SUPABASE_BUCKET_RAW  # "raw_images"
-    if not _ensure_bucket(bucket_name):
-        print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload raw image.")
-        return None
-
     try:
         # Determine file extension from original filename
         ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
         unique_filename = _get_unique_filename(original_filename.replace(f".{ext}", ""), f".{ext}")
 
         print(f"☁️ Mengunggah raw image ke Supabase Storage (bucket: {bucket_name})...")
-        supabase.storage.from_(bucket_name).upload(
-            file=image_bytes,
-            path=unique_filename,
-            file_options={"content-type": f"image/{ext}" if ext != "heic" else "image/heic"}
-        )
+        
+        def _upload():
+            if not _ensure_bucket(bucket_name):
+                print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload raw image.")
+                return False
+                
+            supabase.storage.from_(bucket_name).upload(
+                file=image_bytes,
+                path=unique_filename,
+                file_options={"content-type": f"image/{ext}" if ext != "heic" else "image/heic"}
+            )
+        
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor() as pool:
+            await loop.run_in_executor(pool, _upload)
 
         public_url = supabase.storage.from_(bucket_name).get_public_url(unique_filename)
         print(f"✅ Raw image URL: {public_url}")
@@ -119,19 +127,27 @@ async def upload_glb_bytes(asset_name: str, glb_bytes: bytes) -> Optional[str]:
         return None
 
     bucket_name = settings.SUPABASE_BUCKET_GLB  # "glb_models"
-    if not _ensure_bucket(bucket_name):
-        print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload GLB.")
-        return None
-
     try:
         unique_filename = _get_unique_filename(asset_name, ".glb")
 
-        print(f"☁️ Mengunggah GLB '{asset_name}' ke Supabase Storage (bucket: {bucket_name})...")
-        supabase.storage.from_(bucket_name).upload(
-            file=glb_bytes,
-            path=unique_filename,
-            file_options={"content-type": "model/gltf-binary"}
-        )
+        print(f"☁️ Mengunggah GLB ke Supabase Storage (bucket: {bucket_name})...")
+        
+        def _upload_glb():
+            if not _ensure_bucket(bucket_name):
+                print(f"⚠️ Bucket '{bucket_name}' tidak tersedia, skip upload GLB.")
+                return False
+                
+            supabase.storage.from_(bucket_name).upload(
+                file=glb_bytes,
+                path=unique_filename,
+                file_options={"content-type": "model/gltf-binary"}
+            )
+            
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor() as pool:
+            await loop.run_in_executor(pool, _upload_glb)
 
         public_url = supabase.storage.from_(bucket_name).get_public_url(unique_filename)
         print(f"✅ GLB URL: {public_url}")

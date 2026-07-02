@@ -18,8 +18,16 @@
 
 ---
 
-## 📅 2026-06-30
+## 📅 2026-07-02
 
+### [2026-07-02] [PHASE 5] — httpx.ReadTimeout on Polling / API Hanging
+- **File & Baris:** `backend/api/router.py`, `backend/services/supabase_engine.py`
+- **Pesan Error:** `httpx.ReadTimeout` during `client.get()` in `test_e2e.py`
+- **Penyebab:** Eksekusi network (Supabase I/O) dan beban CUDA (Depth-Anything, Grounding DINO) adalah proses *blocking synchronous* di dalam `async def` FastAPI. Hal ini menghalangi Event Loop `asyncio`, sehingga Uvicorn berhenti melayani request HTTP lain yang masuk (misal, request GET status/polling), menyebabkan API hang dan akhirnya client terkena Timeout.
+- **Solusi:** Membungkus setiap call *blocking* dengan `loop.run_in_executor(pool, func)`. Khusus Supabase dirubah dengan `ThreadPoolExecutor` di dalam fungsinya. Mengubah parameter API Timeout di script client.
+- **Status:** ✅ Fixed
+
+## 📅 2026-06-30
 ### [2026-06-30] [SETUP] — ModuleNotFoundError: No module named 'fastapi'
 - **File & Baris:** `backend/main.py` : L2
 - **Pesan Error:** `ModuleNotFoundError: No module named 'fastapi'`

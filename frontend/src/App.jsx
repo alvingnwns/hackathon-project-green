@@ -102,6 +102,7 @@ function App() {
   const [file, setFile] = useState(null);
   const [previewURL, setPreviewURL] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [progressMsg, setProgressMsg] = useState("");
   const [resultData, setResultData] = useState(null);
 
   const handleFileChange = (e) => {
@@ -115,6 +116,7 @@ function App() {
   const handleUpload = async () => {
     if (!file) return;
     setIsLoading(true);
+    setProgressMsg("Uploading image...");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -142,6 +144,8 @@ function App() {
         } else if (taskData.status === "failed") {
           alert("Pipeline failed: " + taskData.error);
           isDone = true;
+        } else {
+          setProgressMsg(taskData.progress || "Processing...");
         }
         // If status is queued or processing, it will loop again
       }
@@ -155,6 +159,7 @@ function App() {
       }
     } finally {
       setIsLoading(false);
+      setProgressMsg("");
     }
   };
 
@@ -248,7 +253,12 @@ function App() {
               !file || isLoading ? "bg-neutral-600 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02]"
             }`}
           >
-            {isLoading ? "Processing with AI (this may take a while)..." : "Generate Design!"}
+            {isLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>{progressMsg || "Processing with AI..."}</span>
+              </div>
+            ) : "Generate Design!"}
           </button>
           
           <button 

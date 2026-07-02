@@ -133,7 +133,10 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
 
         # 3. Gemini Analysis
         _task_store[task_id]["progress"] = "Running Gemini landscape analysis..."
-        analysis_json_str = analyze_landscape(img)
+        loop = asyncio.get_running_loop()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            analysis_json_str = await loop.run_in_executor(pool, analyze_landscape, img)
         analysis_result = json.loads(analysis_json_str)
 
         # Gatekeeper check
@@ -173,7 +176,8 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
             target_label = "ground" if "LAHAN KOSONG" in raw_target.upper() else raw_target
 
             # Vision Engine
-            vision_data = find_target_object(img, target_label, position_hint)
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                vision_data = await loop.run_in_executor(pool, find_target_object, img, target_label, position_hint)
             if not vision_data:
                 vision_data = {
                     "label": target_label,
@@ -186,7 +190,8 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
             # Depth Engine
             target_u = vision_data["center_coordinate"]["u"]
             target_v = vision_data["center_coordinate"]["v"]
-            spatial_data = extract_depth_at_pixel(img, target_u, target_v)
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                spatial_data = await loop.run_in_executor(pool, extract_depth_at_pixel, img, target_u, target_v)
 
             pc_entry = {
                 "id": idx,
@@ -230,6 +235,24 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                 for res in modal_raw_results:
                     if res["glb_bytes"] and not res["error"]:
                         glb_url = await upload_glb_bytes(res["name"], res["glb_bytes"])
+                        
+                        if not glb_url:
+                            # Fallback to local static directory
+                            print("⚠️ Fallback to local storage for GLB.")
+                            local_dir = os.path.join(settings.STATIC_DIR, "models")
+                            os.makedirs(local_dir, exist_ok=True)
+                            
+                            safe_name = res["name"].replace(" ", "_").lower()
+                            import uuid
+                            unique_id = uuid.uuid4().hex[:8]
+                            filename = f"{safe_name}_{unique_id}.glb"
+                            local_path = os.path.join(local_dir, filename)
+                            
+                            with open(local_path, "wb") as f:
+                                f.write(res["glb_bytes"])
+                            
+                            glb_url = f"/static/models/{filename}"
+                            
                         final_modal_results.append({
                             "name": res["name"],
                             "model_url": glb_url,
@@ -475,3 +498,5 @@ async def process_landscape_sync(
     except Exception as e:
         print(f"❌ [LEGACY] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+

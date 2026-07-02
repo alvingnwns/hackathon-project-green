@@ -40,40 +40,37 @@ class ModalEngine:
     """
 
     def __init__(self):
-        # We look up the deployed classes so this engine can be called 
-        # from anywhere (e.g. FastAPI) without being inside a modal app context.
-        print("🔍 Looking up deployed Modal endpoints...")
-        sd_cls = modal.Cls.from_name("greenscape-sd-xl", "SDXLGenerator")
-        sf3d_cls = modal.Cls.from_name("greenscape-sf3d", "SF3DGenerator")
-        
-        self._sd_generator = sd_cls()
-        self._sf3d_generator = sf3d_cls()
+        self._sd_generator = None
+        self._sf3d_generator = None
+
+    def _ensure_initialized(self):
+        if self._sd_generator is None or self._sf3d_generator is None:
+            print("🔍 Looking up deployed Modal endpoints...")
+            sd_cls = modal.Cls.from_name("greenscape-sd-xl", "SDXLGenerator")
+            sf3d_cls = modal.Cls.from_name("greenscape-sf3d", "SF3DGenerator")
+            self._sd_generator = sd_cls()
+            self._sf3d_generator = sf3d_cls()
 
     async def _run_sd_xl(self, prompt: str) -> bytes:
         """
-        Run SD-XL image generation via Modal.
-        Wraps synchronous Modal call in a thread for async compatibility.
+        Calls the SD-XL modal function using ThreadPoolExecutor to avoid blocking the event loop.
         """
+        self._ensure_initialized()
         loop = asyncio.get_running_loop()
         with ThreadPoolExecutor() as pool:
-            img_bytes = await loop.run_in_executor(
-                pool,
-                lambda: self._sd_generator.generate.remote(prompt)
-            )
-        return img_bytes
+            # .remote(...) is a blocking call, so we run it in a thread
+            result = await loop.run_in_executor(pool, self._sd_generator.generate.remote, prompt)
+        return result
 
     async def _run_sf3d(self, image_bytes: bytes) -> bytes:
         """
-        Run SF3D 3D reconstruction via Modal.
-        Wraps synchronous Modal call in a thread for async compatibility.
+        Calls the SF3D modal function using ThreadPoolExecutor.
         """
+        self._ensure_initialized()
         loop = asyncio.get_running_loop()
         with ThreadPoolExecutor() as pool:
-            glb_bytes = await loop.run_in_executor(
-                pool,
-                lambda: self._sf3d_generator.generate.remote(image_bytes)
-            )
-        return glb_bytes
+            result = await loop.run_in_executor(pool, self._sf3d_generator.generate.remote, image_bytes)
+        return result
 
     async def generate_single_3d(self, prompt: str) -> bytes:
         """

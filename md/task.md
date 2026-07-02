@@ -125,14 +125,14 @@
 - [ ] Test endpoint `GET /api/v1/projects/{project_id}` untuk fetch result
 
 ### Task 5.3 — Frontend: Polling & 3D Rendering
-- [ ] Review frontend polling logic ke `GET /api/v1/tasks/{task_id}`
-- [ ] Pastikan React menerima `assets[]` array dan bisa merender `.glb` via Three.js
-- [ ] Test end-to-end: upload gambar → tunggu pipeline → 3D model tampil di browser
+- [x] Review frontend polling logic ke `GET /api/v1/tasks/{task_id}`
+- [x] Pastikan React menerima `assets[]` array dan bisa merender `.glb` via Three.js
+- [x] Test end-to-end: upload gambar → tunggu pipeline → 3D model tampil di browser
 
 ### Task 5.4 — End-to-End Integration Test (Dry Run)
-- [ ] Jalankan pipeline lengkap dengan `dry_run=true` menggunakan stock GLBs
-- [ ] Pastikan seluruh flow berjalan tanpa error dari Phase 1 hingga Phase 5
-- [ ] Dokumentasikan hasilnya di `logs.md`
+- [x] Jalankan pipeline lengkap dengan `dry_run=true` menggunakan stock GLBs
+- [x] Pastikan seluruh flow berjalan tanpa error dari Phase 1 hingga Phase 5
+- [x] Dokumentasikan hasilnya di `logs.md`
 
 > **📌 Push ke Github setelah Phase 5 selesai!**
 

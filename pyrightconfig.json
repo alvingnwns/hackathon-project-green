@@ -1,0 +1,11 @@
+{
+  "venvPath": "C:/Users/leona/OneDrive/Documents/ORCA/hackathon-project-green/backend",
+  "venv": "green_venv",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": "backend"
+    }
+  ]
+}

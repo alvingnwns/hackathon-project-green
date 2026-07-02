@@ -17,8 +17,19 @@
 
 ---
 
-## 📅 2026-06-30
+## 📅 2026-07-02
 
+### [2026-07-02] [PHASE 5] — Verifikasi Storage, Polling & Integrasi E2E
+- **File:** `backend/services/supabase_engine.py`, `backend/test_e2e.py`, `backend/api/router.py`, `frontend/src/App.jsx`
+- **Perubahan / Hasil Verifikasi:**
+  - ✅ **Supabase Storage:** Diubah ke pola *asynchronous* (`run_in_executor`) menggunakan ThreadPoolExecutor untuk mencegah event-loop Uvicorn terblokir saat request I/O network.
+  - ✅ **Pipeline Asynchronous:** Menghapus blocking call di Vision Engine dan Depth Engine dari Main Thread dengan mengeksekusinya via `loop.run_in_executor`. Uvicorn reload dan backend sekarang sangat responsif tanpa deadlock (ReadTimeout Error terpecahkan).
+  - ✅ **Frontend Polling:** Telah memastikan iterasi status check menggunakan `setInterval` di UI. UI akan terus polling `/api/v1/tasks/{task_id}` sampai pipeline selesai diproses.
+  - ✅ **E2E (End-to-End) Test (Dry Run):** Pengujian `test_e2e.py` berhasil menyelesaikan siklus unggah `process-landscape`, melacak `status` berulang kali, hingga pipeline menyatukan JSON metadata dari vision-depth dengan `glb_models` Supabase URLs. Mengembalikan `assets` array akhir berisi aset 3D yang akurat.
+- **Alasan:** Sinkronisasi blocking pada network API dan PyTorch processing menghentikan Uvicorn dari merespons request GET. Migrasi ke proper async execution memecahkan isu bottleneck ini untuk Production.
+- **Status:** ✅ Selesai
+
+## 📅 2026-06-30
 ### [2026-06-30] [PHASE 3] — Verifikasi Image Processing & Conditional Logic
 - **File:** `backend/services/vision_engine.py`, `backend/services/depth_engine.py`, `backend/services/collision_engine.py`
 - **Perubahan / Hasil Verifikasi:**
