@@ -287,9 +287,10 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
         _task_store[task_id]["progress"] = "Pipeline completed successfully."
 
     except Exception as e:
-        print(f"❌ Pipeline error for task {task_id}: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ [Pipeline Error] {e}\n{error_details}")
         _task_store[task_id]["status"] = "failed"
-        _task_store[task_id]["error"] = str(e)
         _task_store[task_id]["progress"] = f"Pipeline failed: {e}"
 
 

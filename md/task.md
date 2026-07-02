@@ -141,19 +141,19 @@
 ## 🏁 Phase 6: Finalisasi & Polish
 
 ### Task 6.1 — Error Handling & Robustness
-- [ ] Pastikan semua exception di-catch dan dicatat ke `errors.md`
-- [ ] Tambahkan logging yang lebih detail di setiap service
-- [ ] Test skenario failure: Gemini down, Modal timeout, Supabase error
+- [x] Pastikan semua exception di-catch dan dicatat ke `errors.md`
+- [x] Tambahkan logging yang lebih detail di setiap service
+- [x] Test skenario failure: Gemini down, Modal timeout, Supabase error
 
 ### Task 6.2 — Performance Optimization
-- [ ] Review async/await di semua titik bottleneck
-- [ ] Pastikan cold-start Modal.com dioptimasi (image caching)
-- [ ] Cek memory usage saat processing gambar besar
+- [x] Review async/await di semua titik bottleneck
+- [x] Pastikan cold-start Modal.com dioptimasi (image caching)
+- [x] Cek memory usage saat processing gambar besar
 
 ### Task 6.3 — Dokumentasi Final
-- [ ] Update `README.md` dengan instruksi setup lengkap
-- [ ] Pastikan semua `.env` variables terdokumentasi
-- [ ] Final review semua `logs.md` dan `errors.md`
+- [x] Update `README.md` dengan instruksi setup lengkap
+- [x] Pastikan semua `.env` variables terdokumentasi
+- [x] Final review semua `logs.md` dan `errors.md`
 
 > **📌 Final push + tag release ke Github setelah Phase 6 selesai!**
 

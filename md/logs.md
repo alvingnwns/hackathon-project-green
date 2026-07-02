@@ -19,6 +19,15 @@
 
 ## 📅 2026-07-02
 
+### [2026-07-02] [PHASE 6] — Finalisasi & Polish Dokumentasi
+- **File:** `backend/api/router.py`, `README.md`, `md/task.md`
+- **Perubahan / Hasil Verifikasi:**
+  - ✅ **Error Handling & Robustness:** Menambahkan logging `traceback.format_exc()` secara spesifik pada blok Exception global di pipeline `router.py` agar error bisa dilacak akurat tanpa mematikan Event Loop backend. Logika Exception Fallback pada Modal (melalui mapping 'error' key) dan Gemini (`time.sleep` on 503 retry) telah terverifikasi aman.
+  - ✅ **Performance Optimization:** Telah dikonfirmasi dari Phase sebelumnya bahwa pipeline asinkronus (Uvicorn event-loop non-blocking via `ThreadPoolExecutor`) dan memori *cold-start* Modal (lewat `@modal.enter()` untuk Model caching dan resolusi max 1024x1024) bekerja secara ideal.
+  - ✅ **Dokumentasi Final:** Membuat `README.md` baru, lengkap dengan rincian *Tech Stack*, arsitektur, parameter `env`, setup Modal.com, dan deployment commands, menggantikan file yang sebelumnya kosong.
+- **Alasan:** Menyelesaikan persyaratan Polish dari `newDesign.md` untuk rilis versi stabil perdana (v1.0.0).
+- **Status:** ✅ Selesai
+
 ### [2026-07-02] [PHASE 5] — Verifikasi Storage, Polling & Integrasi E2E
 - **File:** `backend/services/supabase_engine.py`, `backend/test_e2e.py`, `backend/api/router.py`, `frontend/src/App.jsx`
 - **Perubahan / Hasil Verifikasi:**
