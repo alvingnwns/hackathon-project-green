@@ -61,10 +61,38 @@ sf3d_image = (
 # Images larger than this will be resized to speed up 3D reconstruction
 MAX_IMAGE_SIZE = 1024
 
+def download_models():
+    """Cache models in the image during build."""
+    import os
+    import urllib.request
+    from huggingface_hub import hf_hub_download
+    
+    # HF_TOKEN is expected by huggingface_hub
+    if "HF_API_TOKEN" in os.environ:
+        os.environ["HF_TOKEN"] = os.environ["HF_API_TOKEN"]
+        
+    # Cache SF3D models
+    hf_hub_download(repo_id="stabilityai/stable-fast-3d", filename="config.yaml")
+    hf_hub_download(repo_id="stabilityai/stable-fast-3d", filename="model.safetensors")
+    
+    # Cache rembg u2net model
+    u2net_path = os.path.expanduser("~/.u2net")
+    os.makedirs(u2net_path, exist_ok=True)
+    urllib.request.urlretrieve(
+        "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
+        os.path.join(u2net_path, "u2net.onnx")
+    )
+
 import os
 
 # Load HF token directly from .env without importing core (which fails in modal cloud context)
 env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+
+# Apply the run_function with secrets to inject HF_API_TOKEN
+sf3d_image = sf3d_image.run_function(
+    download_models, 
+    secrets=[modal.Secret.from_dotenv(env_path)]
+)
 
 @app.cls(
     image=sf3d_image,
@@ -126,11 +154,17 @@ class SF3DGenerator:
         sys.path.insert(0, "/root/sf3d")
         from sf3d.utils import remove_background
 
+        from PIL import ImageEnhance  # type: ignore
+
         # Load image from bytes and convert to RGBA for background removal
         pil_image = PILImage.open(io.BytesIO(image_bytes)).convert("RGBA")
         
         # Remove background
         pil_image = remove_background(pil_image, self.rembg_session)
+        
+        # Boost brightness to compensate for baked shadows
+        enhancer = ImageEnhance.Brightness(pil_image)
+        pil_image = enhancer.enhance(1.5)
 
         # Resize if too large for faster processing
         w, h = pil_image.size
@@ -147,9 +181,9 @@ class SF3DGenerator:
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 mesh, materials = self.model.run_image(
                     pil_image,
-                    bake_resolution=512,
+                    bake_resolution=1024,  # Increased for sharper textures
                     remesh="triangle",     # triangle remeshing for clean topology
-                    vertex_count=5000,     # mid-poly target (approx 10000 faces)
+                    vertex_count=10000,    # Increased for sharper geometry edges
                 )
 
         print(f"✅ Mesh generated: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")

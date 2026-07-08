@@ -38,10 +38,23 @@ sd_image = (
 # Model path constant
 MODEL_NAME = "stabilityai/stable-diffusion-xl-base-1.0"
 
+def download_models():
+    """Cache models in the image during build."""
+    import torch
+    from diffusers import StableDiffusionXLPipeline
+    StableDiffusionXLPipeline.from_pretrained(
+        MODEL_NAME,
+        torch_dtype=torch.float16,
+        use_safetensors=True,
+        variant="fp16",
+    )
+
+sd_image = sd_image.run_function(download_models)
+
 @app.cls(
     image=sd_image,
     gpu="A10G",
-    timeout=300,
+    timeout=600,
 )
 class SDXLGenerator:
     # Model diinisialisasi secara dinamis di load_model (modal.enter),
