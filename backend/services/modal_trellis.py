@@ -69,8 +69,10 @@ trellis_image = (
         # nvdiffrast pyproject.toml requires setuptools>=64 to parse the 'nvdiffrast' package name correctly.
         # We must use --no-build-isolation to allow setup.py to find the CUDA compiler from the torch installation.
         "git clone https://github.com/NVlabs/nvdiffrast.git /tmp/nvdiffrast && pip install /tmp/nvdiffrast --no-build-isolation",
-        # utils3d fork must also be installed without build isolation to bypass metadata parsing bugs
-        "git clone https://github.com/EasternJournalist/utils3d.git /tmp/utils3d && pip install /tmp/utils3d --no-build-isolation",
+        # utils3d fork must also be installed without build isolation to bypass metadata parsing bugs.
+        # We MUST use commit c5daf6f6c244d251f252102d09e9b7bcef791a38 because TRELLIS relies on outdated APIs 
+        # (perspective_from_fov_xy, rasterize_triangle_faces) that were completely removed/renamed in newer commits.
+        "git clone https://github.com/EasternJournalist/utils3d.git /tmp/utils3d && cd /tmp/utils3d && git checkout c5daf6f6c244d251f252102d09e9b7bcef791a38 && cd - && pip install /tmp/utils3d --no-build-isolation",
         # kaolin is required by flexicubes submodule
         "pip install kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.4.0_cu118.html",
         # Clone TRELLIS repo WITH submodules (flexicubes is a git submodule)

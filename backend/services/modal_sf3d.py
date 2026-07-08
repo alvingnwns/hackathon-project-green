@@ -26,8 +26,8 @@ sf3d_image = (
         ]
     )
     .pip_install(
-        "torch==2.6.0",
-        "torchvision==0.21.0",
+        "torch==2.4.0",
+        "torchvision==0.19.0",
         "numpy<2",
         "Pillow==11.1.0",
         "trimesh==4.5.2",
@@ -45,6 +45,8 @@ sf3d_image = (
         # Hapus __init__.py root yang merupakan ComfyUI custom node (import comfy)
         # agar tidak mengganggu import sf3d.system.SF3D
         'rm -f /root/sf3d/__init__.py',
+        # Hapus flag [gpu] pada rembg untuk menghindari onnxruntime-gpu SIGILL (132) di mesin A10G
+        'sed -i "s/rembg\\[gpu\\]/rembg/g" /root/sf3d/requirements.txt',
         # requirements.txt berisi relative paths (./texture_baker/, ./uv_unwrapper/).
         # Harus cd dulu ke /root/sf3d agar relative path di-resolve dengan benar.
         'cd /root/sf3d && pip install -r requirements.txt',

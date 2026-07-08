@@ -122,6 +122,7 @@
   1. Mengganti dependensi dari PyPI standar ke repo GitHub spesifik yang mengandung submodule `torch` (fork oleh `EasternJournalist`).
   2. Karena modul ini tidak dikemas dengan metadata PEP 621 standar yang dipahami oleh pip secara *default*, instalasinya terdeteksi sebagai `UNKNOWN-0.0.0` dan isi modulnya tidak dipindahkan.
   3. Mengubah instalasi dari *block* `.pip_install(...)` menjadi *block* `.run_commands(...)` menggunakan eksekusi eksplisit `git clone https://github.com/EasternJournalist/utils3d.git /tmp/utils3d && pip install /tmp/utils3d --no-build-isolation` agar instalasi langsung menggunakan struktur `setup.py` / `pyproject.toml` dengan mode developer (tanpa build environment isolasi) persis seperti yang kita lakukan pada `nvdiffrast`.
+  4. **Penting:** Versi spesifik `utils3d` dari fork `EasternJournalist` (commit `9a4eb15...` yang diminta oleh `setup.sh` bawaan TRELLIS) ternyata telah merombak API mereka secara masif! Fungsi `perspective_from_fov_xy` dan `rasterize_triangle_faces` (serta parameternya) telah dihapus/diganti namanya. Karena TRELLIS versi *upstream* masih memanggil fungsi lama tersebut, `sed` patch tidak lagi masuk akal. Solusi satu-satunya adalah me- *rollback* instalasi `utils3d` di dalam Modal ke *commit* sebelum perombakan terjadi, yaitu commit `c5daf6f6c244d251f252102d09e9b7bcef791a38`.
 - **Status:** ✅ Fixed
 
 ---
