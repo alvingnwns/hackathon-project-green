@@ -90,24 +90,24 @@
 ## 🟣 Phase 4: Serverless 3D Generation Pipeline (Modal.com)
 
 ### Task 4.1 — Setup & Konfigurasi Modal.com
-- [ ] Verifikasi `MODAL_TOKEN_ID` dan `MODAL_TOKEN_SECRET` di `.env`
-- [ ] Pastikan `modal_engine.py` dapat terkoneksi ke Modal.com API
-- [ ] Test cold-start: cek berapa lama pertama kali container GPU menyala
+- [x] Verifikasi `MODAL_TOKEN_ID` dan `MODAL_TOKEN_SECRET` di `.env`
+- [x] Pastikan `modal_engine.py` dapat terkoneksi ke Modal.com API
+- [x] Test cold-start: cek berapa lama pertama kali container GPU menyala
 
 ### Task 4.2 — SD-XL Pipeline (`modal_sd_xl.py`)
-- [ ] Review script deployment SD-XL 1.0 base model di Modal
-- [ ] Pastikan decorator `@app.function(gpu="A100")` sudah benar
-- [ ] Test generate 1 gambar dari `sd_xl_prompt` dan cek output-nya
+- [x] Review script deployment SD-XL 1.0 base model di Modal
+- [x] Pastikan decorator `@app.function(gpu="A100")` sudah benar
+- [x] Test generate 1 gambar dari `sd_xl_prompt` dan cek output-nya
 
-### Task 4.3 — Stable Fast 3D / SF3D Pipeline (`modal_sf3d.py`)
-- [ ] Review script SF3D di Modal
-- [ ] Pastikan output berupa bytes `.glb` yang valid
-- [ ] Test piping gambar SD-XL output → SF3D → `.glb` bytes
+### Task 4.3 — 3D Pipeline (Menggunakan TRELLIS lokal, menggantikan SF3D Modal)
+- [x] Review script lokal `trellis_engine.py`
+- [x] Pastikan output berupa bytes `.glb` yang valid
+- [x] Test piping gambar SD-XL (Modal) → TRELLIS (Local) → `.glb` bytes
 
-### Task 4.4 — `generate_multiple_3d()` Parallel Execution
-- [ ] Test `modal_engine.generate_multiple_3d()` dengan 2-3 prompt sekaligus
-- [ ] Pastikan asyncio paralel berjalan tanpa race condition
-- [ ] Verifikasi semua hasil dikembalikan dalam urutan yang benar
+### Task 4.4 — Parallel Execution SD-XL
+- [x] Test `modal_engine.generate_multiple_images()` dengan 2-3 prompt sekaligus
+- [x] Pastikan asyncio paralel berjalan tanpa race condition
+- [x] Verifikasi semua hasil dikembalikan dalam urutan yang benar
 
 > **📌 Push ke Github setelah Phase 4 selesai!**
 
@@ -116,13 +116,13 @@
 ## 🟢 Phase 5: Storage & Rendering
 
 ### Task 5.1 — Upload GLB ke Supabase Storage
-- [ ] Test `upload_glb_bytes()` dengan `.glb` file nyata
-- [ ] Pastikan bucket `glb_models` public dan URL dapat diakses
-- [ ] Verifikasi fallback ke `static/models/` lokal jika Supabase gagal
+- [x] Test `upload_glb_bytes()` dengan `.glb` file nyata
+- [x] Pastikan bucket `glb_models` public dan URL dapat diakses
+- [x] Verifikasi fallback ke `static/models/` lokal jika Supabase gagal
 
 ### Task 5.2 — Update Database dengan GLB URL
-- [ ] Pastikan `raw_json` di DB diupdate dengan `model_url` setelah GLB diupload
-- [ ] Test endpoint `GET /api/v1/projects/{project_id}` untuk fetch result
+- [x] Pastikan `raw_json` di DB diupdate dengan `model_url` setelah GLB diupload
+- [x] Test endpoint `GET /api/v1/projects/{project_id}` untuk fetch result
 
 ### Task 5.3 — Frontend: Polling & 3D Rendering
 - [x] Review frontend polling logic ke `GET /api/v1/tasks/{task_id}`

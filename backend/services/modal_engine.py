@@ -39,12 +39,16 @@ class ModalEngine:
 
     def __init__(self):
         self._sd_generator = None
+        self._trellis_generator = None
 
     def _ensure_initialized(self):
         if self._sd_generator is None:
             print("🔍 Looking up deployed Modal endpoints...")
             sd_cls = modal.Cls.from_name("greenscape-sd-xl", "SDXLGenerator")
             self._sd_generator = sd_cls()
+        if self._trellis_generator is None:
+            trellis_cls = modal.Cls.from_name("greenscape-trellis", "TrellisGenerator")
+            self._trellis_generator = trellis_cls()
 
     async def _run_sd_xl(self, prompt: str) -> bytes:
         """
@@ -53,6 +57,8 @@ class ModalEngine:
         self._ensure_initialized()
         # .remote.aio is Modal's native async caller
         result = await self._sd_generator.generate.remote.aio(prompt)
+        return result
+
     async def generate_single_image(self, prompt: str) -> bytes:
         """
         SD-XL text-to-image pipeline for a single component.
@@ -73,6 +79,25 @@ class ModalEngine:
             return img_bytes
         except Exception as e:
             raise ModalPipelineError(f"Modal pipeline failed for prompt '{prompt[:60]}': {e}")
+
+    async def generate_single_3d(self, img_bytes: bytes) -> bytes:
+        """
+        TRELLIS image-to-3d pipeline for a single component.
+
+        Args:
+            img_bytes: PNG file bytes from SD-XL.
+
+        Returns:
+            GLB file bytes.
+        """
+        try:
+            print(f"📐 [Modal] TRELLIS generating 3D asset from image...")
+            self._ensure_initialized()
+            glb_bytes = await self._trellis_generator.generate.remote.aio(img_bytes)
+            print(f"✅ [Modal] 3D asset generated ({len(glb_bytes) / 1024:.1f} KB).")
+            return glb_bytes
+        except Exception as e:
+            raise ModalPipelineError(f"Modal TRELLIS pipeline failed: {e}")
 
     async def generate_multiple_images(
         self, components: List[dict]

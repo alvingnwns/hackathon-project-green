@@ -239,16 +239,14 @@ async def _run_pipeline(task_id: str, img_bytes: bytes, dry_run: bool = False):
                 # Real pipeline: Modal for SD-XL, Local TRELLIS for 3D
                 modal_raw_results = await modal_engine.generate_multiple_images(prompts_for_modal)
 
-                from services.trellis_engine import generate_3d_local
-
-                # Process each image into 3D sequentially to protect VRAM
+                # Process each image into 3D sequentially using Modal TRELLIS
                 for res in modal_raw_results:
                     if res.get("img_bytes") and not res.get("error"):
                         _task_store[task_id]["progress"] = f"TRELLIS Generating 3D for {res['name']}..."
                         
-                        # Generate 3D
+                        # Generate 3D on Modal
                         try:
-                            glb_bytes = await generate_3d_local(res["img_bytes"])
+                            glb_bytes = await modal_engine.generate_single_3d(res["img_bytes"])
                         except Exception as e:
                             print(f"⚠️ TRELLIS failed for {res['name']}: {e}")
                             glb_bytes = None

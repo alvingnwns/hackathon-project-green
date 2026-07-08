@@ -82,8 +82,10 @@ class SDXLGenerator:
 
         if negative_prompt == "":
             negative_prompt = (
+                "multiple objects, collection, group, set, array, grid, pattern, "
                 "people, animals, text, watermark, signature, "
-                "complex background, cluttered scene, low quality, blurry"
+                "complex background, cluttered scene, shadows, floor, ground plane, "
+                "low quality, blurry, deformed, duplicate"
             )
 
         print(f"🎨 Generating image for prompt: '{prompt[:80]}...'")
@@ -93,7 +95,7 @@ class SDXLGenerator:
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 num_inference_steps=30,
-                guidance_scale=7.5,
+                guidance_scale=12.0,
                 width=1024,
                 height=1024,
             )
@@ -117,7 +119,13 @@ class SDXLGenerator:
 @app.local_entrypoint()
 def main():
     generator = SDXLGenerator()
-    test_prompt = "A single modern solar panel on clean white background, isometric view, professional product photography"
+    test_prompt = (
+        "one single solid wooden raised garden planter box, "
+        "((centered in frame)), ((pure white background)), "
+        "3D render, isometric view, studio lighting, "
+        "((isolated object)), ((no shadows)), no floor, "
+        "product shot, miniature model, clean simple composition"
+    )
     print("🧪 Testing SD-XL generation...")
     img_bytes = generator.generate.remote(test_prompt)
     output_path = "test_sdxl_output.png"
